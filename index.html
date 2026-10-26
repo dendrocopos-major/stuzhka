@@ -542,6 +542,9 @@ dialog.sheet .notice { margin: 0; }
 
   function showHandoff() {
     stopAudio();
+    // Draw the song now and cue it while the phone is passed on, so it starts instantly on "Пачаць ход".
+    if (!prepareTurn()) return finish(true);
+    save(); cueSong(false);
     const p = cur();
     $('#handoff-name').textContent = p.name;
     $('#handoff-info').textContent = `${p.timeline.length} з ${S.target} ${plural(S.target, 'карткі', 'картак', 'картак')} · ${p.tokens} ${plural(p.tokens, 'жэтон', 'жэтоны', 'жэтонаў')}`;
@@ -553,12 +556,15 @@ dialog.sheet .notice { margin: 0; }
     if (!S.deck.length) return null;
     return S.deck.pop();
   }
+  function prepareTurn() {
+    if (S.turn) return true;
+    const id = draw();
+    if (!id) return false;
+    S.turn = { song: id, slot: null, challenger: null, cslot: null, picking: 'active', revealed: false, bonus: false, error: false };
+    return true;
+  }
   function startTurn() {
-    if (!S.turn) {
-      const id = draw();
-      if (!id) return finish(true);
-      S.turn = { song: id, slot: null, challenger: null, cslot: null, picking: 'active', revealed: false, bonus: false, error: false };
-    }
+    if (!prepareTurn()) return finish(true);
     S.view = S.current;
     save(); show('game'); render();
     // "Пачаць ход" is a tap, so browsers let the song start right away; if one blocks it, the vinyl still starts it.
@@ -826,7 +832,7 @@ dialog.sheet .notice { margin: 0; }
       width: 200, height: 200,
       playerVars: { controls: 0, disablekb: 1, playsinline: 1, rel: 0, fs: 0, iv_load_policy: 3, origin: location.origin },
       events: {
-        onReady: () => { ytReady = true; if (wantPlay) cueSong(true); },
+        onReady: () => { ytReady = true; cueSong(wantPlay); },
         onStateChange: e => {
           if (e.data === YT.PlayerState.PLAYING) {
             setPlaying(true);
@@ -842,14 +848,23 @@ dialog.sheet .notice { margin: 0; }
     });
   };
 
+  // Start point for "З сярэдзіны": known durations (song.dur) let the player start there directly
+  // instead of playing from 0 and seeking, which buffers twice.
+  function startAt(id) {
+    const d = song(id).dur;
+    if (!S || S.start !== 'mid' || !d) return 0;
+    return d > 90 ? Math.round(d * 0.33) : 0;
+  }
   function cueSong(autoplay = false) {
     if (!S || !S.turn) return;
     const id = S.turn.song;
-    if (!ytReady) { wantPlay = autoplay; return; }
+    if (!ytReady) { wantPlay = wantPlay || autoplay; return; }
     wantPlay = false;
     if (loadedId !== id) {
-      loadedId = id; seekedFor = null;
-      if (autoplay) yt.loadVideoById(id); else yt.cueVideoById(id);
+      loadedId = id;
+      const startSeconds = startAt(id);
+      seekedFor = song(id).dur ? id : null;
+      if (autoplay) yt.loadVideoById({ videoId: id, startSeconds }); else yt.cueVideoById({ videoId: id, startSeconds });
     } else if (autoplay) yt.playVideo();
   }
   function stopAudio() { if (ytReady) { try { yt.stopVideo(); } catch {} } setPlaying(false); }
@@ -873,6 +888,7 @@ dialog.sheet .notice { margin: 0; }
   }
   $('#btn-resume').onclick = () => { ensurePlayer(); showHandoff(); };
   boot();
+  ensurePlayer(); // load the YouTube player in advance: creating it on the first tap adds seconds of delay
 })();
 </script>
 </body>
