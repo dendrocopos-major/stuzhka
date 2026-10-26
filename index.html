@@ -353,7 +353,7 @@ dialog.sheet .notice { margin: 0; }
         <div class="row">
           <button class="btn small ghost" id="btn-fwd">+15 с</button>
           <button class="btn small ghost" id="btn-skip" hidden>Іншая песня</button>
-          <button class="btn small ghost" id="btn-report">Нешта не так</button>
+          <button class="btn small ghost" id="btn-report" hidden>Нешта не так</button>
         </div>
       </div>
     </div>
@@ -805,6 +805,9 @@ dialog.sheet .notice { margin: 0; }
   };
   /* ---------- REPORTS ("Нешта не так") ---------- */
   // Kept in this browser only; the setup screen lets you copy or download them.
+  // Hidden from players until reports are sent to the admin; open the game with ?admin=1 to use them.
+  const ADMIN = new URLSearchParams(location.search).get('admin') === '1';
+  $('#btn-report').hidden = !ADMIN;
   const REPORT_KEY = 'stuzhka-reports-v1';
   const REASONS = ['Няправільны год', 'Не грае ці дрэнны гук', 'Не тая песня ці выканаўца', 'Кавер ці не арыгінальны запіс', 'Не беларуская', 'Іншае'];
   const reports = () => store.get(REPORT_KEY) || [];
@@ -830,7 +833,7 @@ dialog.sheet .notice { margin: 0; }
     `${r.artist} — ${r.title} (${r.year}) [${r.yt}]: ${r.reason}${r.comment ? '. ' + r.comment : ''}`).join('\n');
   function renderReports() {
     const list = reports();
-    $('#reports-panel').hidden = !list.length;
+    $('#reports-panel').hidden = !ADMIN || !list.length;
     $('#reports-count').textContent = list.length;
     const ul = $('#reports-list'); ul.innerHTML = '';
     for (const r of list) ul.append(el('li', {}, el('b', {}, `${r.artist} — ${r.title}`), ` (${r.year}): ${r.reason}${r.comment ? '. ' + r.comment : ''}`));
