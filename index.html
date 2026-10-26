@@ -286,7 +286,7 @@ dialog.sheet .notice { margin: 0; }
 
     <div class="panel">
       <div class="row">
-        <div class="label grow">Якія песні гуляюць</div>
+        <div class="label grow">Якія песні ў калодзе</div>
         <button class="btn ghost small" id="btn-clear-filters">Усе песні</button>
       </div>
       <p class="notice" style="margin:0">Нічога не выбрана ў групе — значыць, падыходзіць усё. Унутры групы дастаткова любога тэга, паміж групамі павінны супасці ўсе.</p>
@@ -433,17 +433,26 @@ dialog.sheet .notice { margin: 0; }
 
   // Tag groups for deck filtering: OR inside a group, AND across groups, empty group = everything.
   const LANGS = { be: 'Па-беларуску', ru: 'Па-руску', en: 'Па-англійску' };
+  const OTHER_LANG = 'На іншых мовах';
   const GENRE_ORDER = ['Поп', 'Рок', 'Эстрада', 'Фолк', 'Хіп-хоп', 'Інды', 'Метал'];
   const songGroups = s => ({
-    lang: [LANGS[s.lang] || 'Іншая мова'],
+    lang: [LANGS[s.lang] || OTHER_LANG],
     genre: (s.tags || []).filter(t => GENRE_ORDER.includes(t)),
   });
   const FILTER_GROUPS = [['lang', 'Мова'], ['genre', 'Жанр']];
+
+  // Songs this player may get. For players in Belarus it drops songs whose materials are recognised
+  // there as "extremist" (byRisk in songs.js): playing or sharing them is punishable in Belarus.
+  let BASE = SONGS;
   const tagCounts = {};
-  for (const s of SONGS) for (const [g, vals] of Object.entries(songGroups(s))) for (const v of vals) {
-    tagCounts[g] = tagCounts[g] || {}; tagCounts[g][v] = (tagCounts[g][v] || 0) + 1;
+  function countTags() {
+    for (const g of Object.keys(tagCounts)) delete tagCounts[g];
+    for (const s of BASE) for (const [g, vals] of Object.entries(songGroups(s))) for (const v of vals) {
+      tagCounts[g] = tagCounts[g] || {}; tagCounts[g][v] = (tagCounts[g][v] || 0) + 1;
+    }
   }
-  const order = (g, vals) => g === 'genre' ? GENRE_ORDER.filter(v => vals.includes(v)) : Object.values(LANGS).filter(v => vals.includes(v));
+  countTags();
+  const order = (g, vals) => g === 'genre' ? GENRE_ORDER.filter(v => vals.includes(v)) : [...Object.values(LANGS), OTHER_LANG].filter(v => vals.includes(v));
   prefs.filters = prefs.filters || {};
   for (const [g] of FILTER_GROUPS) prefs.filters[g] = (prefs.filters[g] || []).filter(v => tagCounts[g] && tagCounts[g][v]);
 
@@ -480,18 +489,52 @@ dialog.sheet .notice { margin: 0; }
   }
   $('#btn-add-player').onclick = () => { prefs.names.push('Гулец ' + (prefs.names.length + 1)); store.set(PREF_KEY, prefs); renderPlayers(); };
 
-  if (DONATE_URL) { $('#donate-link').href = DONATE_URL; $('#donate-panel').hidden = false; }
-  // On the win screen too: that's when people liked the game the most.
-  if (DONATE_URL) $('#btn-new').before(el('a', { class: 'btn ghost', href: DONATE_URL, target: '_blank', rel: 'noopener' }, 'Падтрымаць аўтара'));
+  // Donations: never offered to players in Belarus, where donating could be treated as "financing extremism".
+  let inBelarus = false;
+  const winDonate = DONATE_URL ? el('a', { class: 'btn ghost', href: DONATE_URL, target: '_blank', rel: 'noopener' }, 'Падтрымаць аўтара') : null;
+  if (winDonate) $('#btn-new').before(winDonate); // on the win screen too: that's when people liked the game the most
+  function renderDonate() {
+    const show = !!DONATE_URL && !inBelarus;
+    if (DONATE_URL) $('#donate-link').href = DONATE_URL;
+    $('#donate-panel').hidden = !show;
+    if (winDonate) winDonate.hidden = !show;
+  }
 
   // "Толькі хіты": songs marked hit: true in songs.js; the toggle shows up once any are marked.
-  const HITS = SONGS.filter(s => s.hit).length;
-  $('#hits-toggle').hidden = !HITS;
-  $('#hits-count').textContent = String(HITS);
-  $('#opt-hits').checked = !!prefs.hitsOnly && HITS > 0;
+  let HITS = 0;
+  function renderHits() {
+    HITS = BASE.filter(s => s.hit).length;
+    $('#hits-toggle').hidden = !HITS;
+    $('#hits-count').textContent = String(HITS);
+    $('#opt-hits').checked = !!prefs.hitsOnly && HITS > 0;
+  }
   $('#opt-hits').onchange = e => { prefs.hitsOnly = e.target.checked; store.set(PREF_KEY, prefs); renderDeckInfo(); };
 
-  const pool = () => SONGS.filter(s => {
+  // Country check: Cloudflare's trace (country.is as a fallback) plus the device time zone.
+  // Starting a game waits for the answer; if the check fails, the Minsk time zone alone decides.
+  async function fetchCountry() {
+    const get = (url, ms = 3000) => Promise.race([fetch(url, { cache: 'no-store' }).then(r => r.text()),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+    try { return (await get('https://www.cloudflare.com/cdn-cgi/trace')).match(/^loc=(\w+)/m)[1]; } catch {}
+    try { return JSON.parse(await get('https://api.country.is/')).country; } catch {}
+    return null;
+  }
+  function applyRegion(by) {
+    inBelarus = by;
+    BASE = by ? SONGS.filter(s => !s.byRisk) : SONGS;
+    countTags(); renderHits(); renderFilters(); renderDeckInfo(); renderDonate();
+    if (by && S) { // a saved game may hold songs that must not play here
+      S.deck = S.deck.filter(id => !song(id).byRisk);
+      if (S.turn && !S.turn.revealed && song(S.turn.song).byRisk) S.turn = null;
+      save();
+    }
+  }
+  const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return ''; } })();
+  const forced = new URLSearchParams(location.search).get('region'); // ?region=BY to test the Belarus mode
+  const regionReady = (forced ? Promise.resolve(forced.toUpperCase()) : fetchCountry())
+    .then(c => applyRegion(c === 'BY' || (!forced && tz === 'Europe/Minsk')));
+
+  const pool = () => BASE.filter(s => {
     if (prefs.hitsOnly && HITS && !s.hit) return false;
     const sg = songGroups(s);
     return FILTER_GROUPS.every(([g]) => !prefs.filters[g].length || sg[g].some(v => prefs.filters[g].includes(v)));
@@ -533,7 +576,7 @@ dialog.sheet .notice { margin: 0; }
     save(); showHandoff();
   }
   function showErr(t) { $('#setup-err').textContent = t; }
-  $('#btn-start').onclick = () => { ensurePlayer(); newGame(); };
+  $('#btn-start').onclick = async () => { ensurePlayer(); await regionReady; newGame(); };
 
   /* ---------- STATE ---------- */
   function save() { store.set(SAVE_KEY, S); }
@@ -881,12 +924,12 @@ dialog.sheet .notice { margin: 0; }
   function boot() {
     S = store.get(SAVE_KEY);
     if (S && !S.players?.every(p => p.timeline.every(id => BY_ID.has(id)))) S = null;
-    renderPlayers(); renderFilters(); renderDeckInfo(); renderReports();
+    renderPlayers(); renderHits(); renderFilters(); renderDeckInfo(); renderReports();
     $('#resume-panel').hidden = !S;
     if (S) $('#resume-info').textContent = S.players.map(p => `${p.name} ${p.timeline.length}`).join(' · ');
     show('setup');
   }
-  $('#btn-resume').onclick = () => { ensurePlayer(); showHandoff(); };
+  $('#btn-resume').onclick = async () => { ensurePlayer(); await regionReady; showHandoff(); };
   boot();
   ensurePlayer(); // load the YouTube player in advance: creating it on the first tap adds seconds of delay
 })();
