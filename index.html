@@ -175,6 +175,26 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
   .gap { width: 6px; }
 }
 
+/* Start page on a computer: intro, rules, players and options on the left, the deck filters and the start button on the right,
+   so the whole page fits on one screen */
+@media (min-width: 900px) {
+  #setup {
+    display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; align-items: start; align-content: start;
+    grid-template-areas: "hero deck" "rules deck" "resume deck" "players deck" "opts start" "reports reports" "donate donate";
+  }
+  #setup > .hero { grid-area: hero; }
+  #setup > .hero h1 { font-size: 48px; }
+  #setup > .rules { grid-area: rules; }
+  #resume-panel { grid-area: resume; }
+  #players-panel { grid-area: players; }
+  #opts-panel { grid-area: opts; }
+  #start-row { grid-area: start; align-self: end; }
+  #deck-panel { grid-area: deck; }
+  #reports-panel { grid-area: reports; }
+  #donate-panel { grid-area: donate; }
+  #setup > :not([hidden]) { min-width: 0; }
+}
+
 /* Turntable */
 .deck { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
 @media (max-width: 460px) { .deck { grid-template-columns: 1fr; justify-items: center; text-align: center; } .deck .row { justify-content: center; } }
@@ -285,13 +305,13 @@ dialog.sheet .notice { margin: 0; }
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="players-panel">
       <div class="label">Гульцы ці каманды</div>
       <div class="players" id="players"></div>
       <div><button class="btn ghost small" id="btn-add-player">+ Дадаць гульца</button></div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="opts-panel">
       <div class="opts">
         <label class="opt"><span class="label">Картак для перамогі</span>
           <select id="opt-target"><option>5</option><option>8</option><option selected>10</option><option>12</option><option>15</option></select>
@@ -302,7 +322,7 @@ dialog.sheet .notice { margin: 0; }
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="deck-panel">
       <div class="label">Якія песні ў калодзе</div>
       <p class="notice" style="margin:0">Нічога не выбрана ў групе — значыць, падыходзіць усё. Унутры групы дастаткова любога тэга, паміж групамі павінны супасці ўсе.</p>
       <label class="toggle" id="hits-toggle" hidden><input type="checkbox" id="opt-hits"> Толькі хіты</label>
@@ -313,7 +333,7 @@ dialog.sheet .notice { margin: 0; }
       </div>
     </div>
 
-    <div class="row end">
+    <div class="row end" id="start-row">
       <span class="err" id="setup-err"></span>
       <button class="btn primary" id="btn-start">Пачаць гульню</button>
     </div>
