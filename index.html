@@ -524,15 +524,16 @@ dialog.sheet .notice { margin: 0; }
     BASE = by ? SONGS.filter(s => !s.byRisk) : SONGS;
     countTags(); renderHits(); renderFilters(); renderDeckInfo(); renderDonate();
     if (by && S) { // a saved game may hold songs that must not play here
-      S.deck = S.deck.filter(id => !song(id).byRisk);
-      if (S.turn && !S.turn.revealed && song(S.turn.song).byRisk) S.turn = null;
+      S.deck = S.deck.filter(id => !song(id)?.byRisk);
+      if (S.turn && !S.turn.revealed && song(S.turn.song)?.byRisk) S.turn = null;
       save();
     }
   }
   const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return ''; } })();
   const forced = new URLSearchParams(location.search).get('region'); // ?region=BY to test the Belarus mode
   const regionReady = (forced ? Promise.resolve(forced.toUpperCase()) : fetchCountry())
-    .then(c => applyRegion(c === 'BY' || (!forced && tz === 'Europe/Minsk')));
+    .then(c => applyRegion(c === 'BY' || (!forced && tz === 'Europe/Minsk')))
+    .catch(() => {}); // never block starting a game
 
   const pool = () => BASE.filter(s => {
     if (prefs.hitsOnly && HITS && !s.hit) return false;
@@ -924,6 +925,10 @@ dialog.sheet .notice { margin: 0; }
   function boot() {
     S = store.get(SAVE_KEY);
     if (S && !S.players?.every(p => p.timeline.every(id => BY_ID.has(id)))) S = null;
+    if (S) { // songs removed from songs.js since the game was saved
+      S.deck = S.deck.filter(id => BY_ID.has(id));
+      if (S.turn && !BY_ID.has(S.turn.song)) S.turn = null;
+    }
     renderPlayers(); renderHits(); renderFilters(); renderDeckInfo(); renderReports();
     $('#resume-panel').hidden = !S;
     if (S) $('#resume-info').textContent = S.players.map(p => `${p.name} ${p.timeline.length}`).join(' · ');
