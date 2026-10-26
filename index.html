@@ -162,6 +162,18 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
 .slot.sel-c { width: 52px; border-style: solid; border-color: var(--ink); background: var(--sunken); color: var(--ink); }
 .slot:disabled { cursor: default; opacity: .5; }
 .gap { flex: 0 0 auto; width: 8px; }
+/* Phones: narrow cards with just the year, so 5–6 fit on screen; a tap opens a card to show the artist and the title */
+@media (max-width: 600px) {
+  .timeline { min-height: 84px; padding-bottom: 8px; }
+  .card { width: 48px; min-height: 72px; padding: 6px 2px; gap: 3px; cursor: pointer; grid-template-rows: 1fr; align-items: center; text-align: center; }
+  .card .yr { font-size: 14px; letter-spacing: -0.03em; }
+  .card .ar, .card .ti { display: none; }
+  .card.open { width: 132px; text-align: left; padding: 8px; grid-template-rows: auto auto 1fr; align-items: start; }
+  .card.open .ar, .card.open .ti { display: block; }
+  .slot { width: 16px; margin: 0 1px; border-width: 1.5px; font-size: 14px; }
+  .slot.sel-a, .slot.sel-c { width: 34px; }
+  .gap { width: 6px; }
+}
 
 /* Turntable */
 .deck { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
@@ -699,7 +711,8 @@ dialog.sheet .notice { margin: 0; }
 
   /* ---------- RENDER ---------- */
   function cardEl(s, extra = '') {
-    return el('div', { class: 'card ' + extra, style: `--h:${hue(s.year)}` },
+    return el('div', { class: 'card ' + extra, style: `--h:${hue(s.year)}`, title: `${s.artist} — ${s.title}`,
+      onclick: e => e.currentTarget.classList.toggle('open') },
       el('div', { class: 'yr' }, String(s.year)),
       el('div', { class: 'ar' }, s.artist),
       el('div', { class: 'ti' }, s.title));
