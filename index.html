@@ -561,7 +561,8 @@ dialog.sheet .notice { margin: 0; }
     }
     S.view = S.current;
     save(); show('game'); render();
-    if (!S.turn.revealed) cueSong();
+    // "Пачаць ход" is a tap, so browsers let the song start right away; if one blocks it, the vinyl still starts it.
+    if (!S.turn.revealed) cueSong(true);
   }
 
   function fits(timeline, slot, year) {
