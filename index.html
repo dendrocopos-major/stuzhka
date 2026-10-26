@@ -287,7 +287,7 @@ dialog.sheet .notice { margin: 0; }
     <div class="panel">
       <div class="label">Якія песні ў калодзе</div>
       <p class="notice" style="margin:0">Нічога не выбрана ў групе — значыць, падыходзіць усё. Унутры групы дастаткова любога тэга, паміж групамі павінны супасці ўсе.</p>
-      <label class="toggle" id="hits-toggle" hidden><input type="checkbox" id="opt-hits"> Толькі хіты <span class="muted" id="hits-count"></span></label>
+      <label class="toggle" id="hits-toggle" hidden><input type="checkbox" id="opt-hits"> Толькі хіты</label>
       <div class="filters" id="filters"></div>
       <div style="display:grid;gap:8px">
         <div class="label" id="deck-info"></div>
@@ -379,9 +379,10 @@ dialog.sheet .notice { margin: 0; }
     <p class="notice">Назву не пакажам, калі картка яшчэ не адкрытая.</p>
     <div class="reasons" id="report-reasons"></div>
     <textarea id="report-comment" rows="3" maxlength="500" placeholder="Каментар, напрыклад правільны год"></textarea>
+    <p class="notice" id="report-error" hidden>Не атрымалася адправіць. Праверце інтэрнэт і паспрабуйце яшчэ раз.</p>
     <div class="row end">
       <button type="button" class="btn ghost small" id="report-cancel">Адмяніць</button>
-      <button type="submit" class="btn primary small">Захаваць</button>
+      <button type="submit" class="btn primary small" id="report-send">Захаваць</button>
     </div>
   </form>
 </dialog>
@@ -511,7 +512,6 @@ dialog.sheet .notice { margin: 0; }
   function renderHits() {
     HITS = BASE.filter(s => s.hit).length;
     $('#hits-toggle').hidden = !HITS;
-    $('#hits-count').textContent = String(HITS);
     $('#opt-hits').checked = !!prefs.hitsOnly && HITS > 0;
   }
   $('#opt-hits').onchange = e => { prefs.hitsOnly = e.target.checked; store.set(PREF_KEY, prefs); renderFilters(); renderDeckInfo(); };
@@ -729,7 +729,7 @@ dialog.sheet .notice { margin: 0; }
     });
 
     // deck controls
-    $('#btn-report').textContent = t.reported ? 'Заўвага захаваная' : 'Нешта не так';
+    $('#btn-report').textContent = t.reported ? (REPORT_FORM.action ? 'Заўвага адпраўленая' : 'Заўвага захаваная') : 'Нешта не так';
     $('#btn-fwd').disabled = !t.song;
     renderStatus();
 
@@ -810,10 +810,13 @@ dialog.sheet .notice { margin: 0; }
     save(); render(); cueSong(true);
   };
   /* ---------- REPORTS ("Нешта не так") ---------- */
-  // Kept in this browser only; the setup screen lets you copy or download them.
-  // Hidden from players until reports are sent to the admin; open the game with ?admin=1 to use them.
+  // Sent to a Google Form: action is its .../formResponse address, the rest are its entry.N field names.
+  // Until the form is set, the button only shows with ?admin=1 and reports stay in this browser
+  // (the setup screen lets you copy or download them).
+  const REPORT_FORM = { action: '', song: '', id: '', reason: '', comment: '' };
   const ADMIN = new URLSearchParams(location.search).get('admin') === '1';
-  $('#btn-report').hidden = !ADMIN;
+  $('#btn-report').hidden = !(REPORT_FORM.action || ADMIN);
+  $('#report-send').textContent = REPORT_FORM.action ? 'Адправіць' : 'Захаваць';
   const REPORT_KEY = 'stuzhka-reports-v1';
   const REASONS = ['Няправільны год', 'Не грае ці дрэнны гук', 'Не тая песня ці выканаўца', 'Кавер ці не арыгінальны запіс', 'Не беларуская', 'Іншае'];
   const reports = () => store.get(REPORT_KEY) || [];
@@ -822,16 +825,27 @@ dialog.sheet .notice { margin: 0; }
     REASONS.forEach((r, i) => box.append(el('label', { class: 'toggle' },
       el('input', { type: 'radio', name: 'reason', value: r, checked: i === 0 }), r)));
     $('#report-comment').value = '';
+    $('#report-error').hidden = true;
     $('#report-dlg').showModal();
   };
   $('#report-cancel').onclick = () => $('#report-dlg').close();
-  $('#report-form').onsubmit = e => {
+  $('#report-form').onsubmit = async e => {
     e.preventDefault();
     const s = song(S.turn.song);
-    const list = reports();
-    list.push({ yt: s.yt, artist: s.artist, title: s.title, year: s.year,
-      reason: $('#report-form').reason.value, comment: $('#report-comment').value.trim(), at: new Date().toISOString().slice(0, 16) });
-    store.set(REPORT_KEY, list);
+    const r = { yt: s.yt, artist: s.artist, title: s.title, year: s.year,
+      reason: $('#report-form').reason.value, comment: $('#report-comment').value.trim(), at: new Date().toISOString().slice(0, 16) };
+    if (REPORT_FORM.action) {
+      const f = REPORT_FORM, btn = $('#report-send');
+      const body = new URLSearchParams({ [f.song]: `${r.artist} — ${r.title} (${r.year})`, [f.id]: r.yt, [f.reason]: r.reason, [f.comment]: r.comment });
+      btn.disabled = true;
+      // Google Forms sends no CORS headers: the reply is opaque, only a network failure is visible.
+      try { await fetch(f.action, { method: 'POST', mode: 'no-cors', body }); }
+      catch { $('#report-error').hidden = false; return; }
+      finally { btn.disabled = false; }
+    } else {
+      store.set(REPORT_KEY, [...reports(), r]);
+      renderReports();
+    }
     S.turn.reported = true; save();
     $('#report-dlg').close(); render();
   };
