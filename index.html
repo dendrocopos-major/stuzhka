@@ -183,6 +183,12 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
 .spin .vinyl { animation: spin 3.2s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin .vinyl, .card.new { animation: none; } }
+/* Once a place is picked, the challenge and result panels need the room: the turntable shrinks into one row */
+.deck.compact { grid-template-columns: auto 1fr; justify-items: start; text-align: left; gap: 12px; }
+.deck.compact .vinyl-box { width: 72px; height: 72px; }
+.deck.compact .vinyl .glyph svg { width: 20px; height: 20px; }
+.deck.compact #st-text { display: none; }
+.deck.compact .row { justify-content: flex-start; }
 .status { display: grid; gap: 8px; min-width: 0; }
 .status h3 { font-size: 20px; }
 .status p { margin: 0; color: var(--muted); }
@@ -748,6 +754,7 @@ dialog.sheet .notice { margin: 0; }
     // reveal
     const rv = $('#reveal');
     rv.hidden = !t.revealed;
+    $('#deck').classList.toggle('compact', t.revealed || t.slot != null);
     if (t.revealed) {
       const s = song(t.song);
       rv.className = 'reveal ' + (t.ok ? 'ok' : 'bad');
