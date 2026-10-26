@@ -285,10 +285,7 @@ dialog.sheet .notice { margin: 0; }
     </div>
 
     <div class="panel">
-      <div class="row">
-        <div class="label grow">Якія песні ў калодзе</div>
-        <button class="btn ghost small" id="btn-clear-filters">Усе песні</button>
-      </div>
+      <div class="label">Якія песні ў калодзе</div>
       <p class="notice" style="margin:0">Нічога не выбрана ў групе — значыць, падыходзіць усё. Унутры групы дастаткова любога тэга, паміж групамі павінны супасці ўсе.</p>
       <label class="toggle" id="hits-toggle" hidden><input type="checkbox" id="opt-hits"> Толькі хіты <span class="muted" id="hits-count"></span></label>
       <div class="filters" id="filters"></div>
@@ -456,11 +453,24 @@ dialog.sheet .notice { margin: 0; }
   prefs.filters = prefs.filters || {};
   for (const [g] of FILTER_GROUPS) prefs.filters[g] = (prefs.filters[g] || []).filter(v => tagCounts[g] && tagCounts[g][v]);
 
+  // Chip counts follow the rest of the selection: "Толькі хіты" and the other group's chips,
+  // so each number is how many songs that chip would leave in the deck.
+  function facetCounts(g) {
+    const counts = {};
+    for (const s of BASE) {
+      if (prefs.hitsOnly && HITS && !s.hit) continue;
+      const sg = songGroups(s);
+      if (!FILTER_GROUPS.every(([o]) => o === g || !prefs.filters[o].length || sg[o].some(v => prefs.filters[o].includes(v)))) continue;
+      for (const v of sg[g]) counts[v] = (counts[v] || 0) + 1;
+    }
+    return counts;
+  }
   function renderFilters() {
     const box = $('#filters'); box.innerHTML = '';
     for (const [g, title] of FILTER_GROUPS) {
       if (!tagCounts[g]) continue;
       const vals = order(g, Object.keys(tagCounts[g]));
+      const counts = facetCounts(g);
       box.append(el('div', { class: 'fgroup' }, el('div', { class: 'label' }, title),
         el('div', { class: 'fchips' }, vals.map(v => el('button', {
           class: 'fchip', 'aria-pressed': String(prefs.filters[g].includes(v)),
@@ -468,13 +478,9 @@ dialog.sheet .notice { margin: 0; }
             const sel = prefs.filters[g];
             sel.includes(v) ? sel.splice(sel.indexOf(v), 1) : sel.push(v);
             store.set(PREF_KEY, prefs); renderFilters(); renderDeckInfo();
-          } }, v, el('small', {}, String(tagCounts[g][v])))))));
+          } }, v, el('small', {}, String(counts[v] || 0)))))));
     }
   }
-  $('#btn-clear-filters').onclick = () => {
-    for (const [g] of FILTER_GROUPS) prefs.filters[g] = [];
-    store.set(PREF_KEY, prefs); renderFilters(); renderDeckInfo();
-  };
 
   function renderPlayers() {
     const box = $('#players'); box.innerHTML = '';
@@ -508,7 +514,7 @@ dialog.sheet .notice { margin: 0; }
     $('#hits-count').textContent = String(HITS);
     $('#opt-hits').checked = !!prefs.hitsOnly && HITS > 0;
   }
-  $('#opt-hits').onchange = e => { prefs.hitsOnly = e.target.checked; store.set(PREF_KEY, prefs); renderDeckInfo(); };
+  $('#opt-hits').onchange = e => { prefs.hitsOnly = e.target.checked; store.set(PREF_KEY, prefs); renderFilters(); renderDeckInfo(); };
 
   // Country check: Cloudflare's trace (country.is as a fallback) plus the device time zone.
   // Starting a game waits for the answer; if the check fails, the Minsk time zone alone decides.
