@@ -317,7 +317,6 @@ dialog.sheet .notice { margin: 0; }
         <li>Пасля таго як ты выбраў месца, іншы гулец можа аспрэчыць: аддае жэтон і выбірае іншае месца. Калі ты памыліўся, а ён не, картка дастаецца яму.</li>
         <li>Адкрываем картку. Калі месца правільнае, картка застаецца ў цябе. Песні аднаго года можна ставіць у любым парадку.</li>
         <li>Назваў выканаўцу і назву? Атрымай +1 жэтон (не больш за 5).</li>
-        <li>Жэтон можна аддаць, каб прапусціць песню.</li>
         <li>Перамагае першы, хто збярэ патрэбную колькасць картак.</li>
       </ol>
     </details>
@@ -353,7 +352,7 @@ dialog.sheet .notice { margin: 0; }
         <p id="st-text">Песня пачне гучаць. Потым выберы месца на стужцы.</p>
         <div class="row">
           <button class="btn small ghost" id="btn-fwd">+15 с</button>
-          <button class="btn small ghost" id="btn-skip">Прапусціць · 1 жэтон</button>
+          <button class="btn small ghost" id="btn-skip" hidden>Іншая песня</button>
           <button class="btn small ghost" id="btn-report">Нешта не так</button>
         </div>
       </div>
@@ -673,7 +672,6 @@ dialog.sheet .notice { margin: 0; }
     });
 
     // deck controls
-    $('#btn-skip').disabled = t.revealed || p.tokens < 1;
     $('#btn-report').textContent = t.reported ? 'Заўвага захаваная' : 'Нешта не так';
     $('#btn-fwd').disabled = !t.song;
     renderStatus();
@@ -732,11 +730,11 @@ dialog.sheet .notice { margin: 0; }
   function renderStatus() {
     const t = S.turn;
     if (t.revealed) { $('#st-title').textContent = 'Картка адкрыта'; $('#st-text').textContent = 'Можна даслухаць песню.'; }
-    else if (t.error) { $('#st-title').textContent = 'Відэа не грае'; $('#st-text').textContent = 'Гэтае відэа недаступнае. Прапусці песню бясплатна.'; }
+    else if (t.error) { $('#st-title').textContent = 'Відэа не грае'; $('#st-text').textContent = 'Гэтае відэа недаступнае. Вазьмі іншую песню.'; }
     else if (!playing) { $('#st-title').textContent = 'Націсні на пласцінку'; $('#st-text').textContent = 'Песня пачне гучаць. Потым выберы месца на стужцы.'; }
     else { $('#st-title').textContent = 'Гучыць...'; $('#st-text').textContent = 'Слухай і выбірай месца на стужцы.'; }
-    $('#btn-skip').textContent = t.error ? 'Іншая песня · бясплатна' : 'Прапусціць · 1 жэтон';
-    if (t.error) $('#btn-skip').disabled = false;
+    // The only way to replace a song: when its video doesn't play.
+    $('#btn-skip').hidden = !(t.error && !t.revealed);
   }
 
   function pickSlot(i) {
@@ -746,8 +744,8 @@ dialog.sheet .notice { margin: 0; }
   }
 
   $('#btn-skip').onclick = () => {
-    const t = S.turn, p = cur();
-    if (!t.error) { if (p.tokens < 1) return; p.tokens--; }
+    const t = S.turn;
+    if (!t.error) return;
     if (t.challenger != null) S.players[t.challenger].tokens++;
     const id = draw();
     if (!id) return finish(true);
