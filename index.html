@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="be">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Песенная стужка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Unbounded:wght@500;700;800&display=swap">
+<style>
+/* Layout: one phone passed around the table — scoreboard on top, the active player's timeline in the middle, the turntable and actions at the bottom. Vyshyvanka-red band as the only ornament. */
+:root {
+  --bg: #fbfafa;
+  --surface: #ffffff;
+  --sunken: #f1eded;
+  --ink: #1e191b;
+  --muted: #6d6367;
+  --line: #e5dee1;
+  --accent: #c3112b;
+  --accent-ink: #ffffff;
+  --ok: #1d7a46;
+  --bad: #b3261e;
+  --card-l: 0.88;
+  --card-c: 0.07;
+  --vinyl: #1e191b;
+  --vinyl-groove: #3a3236;
+  --f-display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --f-body: "Golos Text", "Segoe UI", system-ui, sans-serif;
+  --r: 12px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141113; --surface: #1f1a1d; --sunken: #191517; --ink: #f4eef1; --muted: #a99ea3; --line: #352d31;
+    --accent: #ff4d5e; --accent-ink: #1a0b0e; --ok: #4cc584; --bad: #ff6b60; --card-l: 0.40; --card-c: 0.09;
+    --vinyl: #050405; --vinyl-groove: #2a2427; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141113; --surface: #1f1a1d; --sunken: #191517; --ink: #f4eef1; --muted: #a99ea3; --line: #352d31;
+  --accent: #ff4d5e; --accent-ink: #1a0b0e; --ok: #4cc584; --bad: #ff6b60; --card-l: 0.40; --card-c: 0.09;
+  --vinyl: #050405; --vinyl-groove: #2a2427; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+section { width: 100%; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.45 var(--f-body);
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 760px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.1; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+
+/* Ornament band */
+.band { display: block; width: 100%; height: 14px; color: var(--accent); }
+
+/* Buttons */
+.btn {
+  border: 0; border-radius: 999px; padding: 12px 20px; font-weight: 600; cursor: pointer;
+  background: var(--sunken); color: var(--ink); min-height: 46px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn:hover:not(:disabled) { filter: brightness(0.97); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; border: 1.5px solid var(--line); }
+.btn.small { min-height: 36px; padding: 6px 14px; font-size: 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row.end { justify-content: flex-end; }
+.grow { flex: 1 1 auto; }
+
+/* Setup */
+.hero { display: grid; gap: 10px; padding-top: 8px; }
+.hero h1 { font-size: clamp(34px, 9vw, 58px); font-weight: 800; letter-spacing: -0.02em; }
+.hero h1 span { color: var(--accent); }
+.hero p { margin: 0; max-width: 58ch; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 14px; }
+.players { display: grid; gap: 8px; }
+.player-input { display: flex; gap: 8px; }
+.player-input input {
+  flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 10px;
+  border: 1.5px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.icon-btn { width: 44px; height: 44px; border-radius: 10px; border: 1.5px solid var(--line); background: transparent; cursor: pointer; font-size: 20px; line-height: 1; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.opt { display: grid; gap: 6px; min-width: 0; }
+.opt select { width: 100%; min-width: 0; text-overflow: ellipsis; font: inherit; padding: 10px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); color: var(--ink); }
+.hist { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 6px; align-items: end; height: 92px; }
+.hist .bar { display: grid; gap: 4px; justify-items: center; align-self: end; }
+.hist .bar i { display: block; width: 100%; border-radius: 6px 6px 2px 2px; min-height: 4px; }
+.hist .bar b { font: 600 11px var(--f-body); color: var(--muted); font-variant-numeric: tabular-nums; }
+.hist .bar small { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.filters { display: grid; gap: 12px; }
+.fgroup { display: grid; gap: 6px; }
+.fchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fchip {
+  border: 1.5px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 12px;
+  font-size: 14px; cursor: pointer; display: inline-flex; gap: 6px; align-items: baseline;
+}
+.fchip small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.fchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.fchip[aria-pressed="true"] small { color: inherit; opacity: .8; }
+details.rules { border-top: 1px solid var(--line); padding-top: 12px; }
+details.rules summary { cursor: pointer; font-weight: 600; }
+details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px; max-width: 64ch; }
+
+/* Scoreboard */
+.score { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.score::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto; border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 12px;
+  display: flex; gap: 8px; align-items: center; font-size: 14px; background: var(--surface); cursor: pointer;
+}
+.chip.cur { border-color: var(--accent); }
+.chip.viewing { background: var(--sunken); }
+.chip b { font-variant-numeric: tabular-nums; }
+.tokens { display: inline-flex; gap: 3px; }
+.tokens i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: block; }
+
+/* Timeline */
+.tl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.tl-head h2 { font-size: 18px; }
+.timeline {
+  display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 6px 2px 12px;
+  scroll-snap-type: x proximity; min-height: 150px;
+}
+.card {
+  flex: 0 0 auto; width: 112px; min-height: 136px; border-radius: 10px; padding: 10px;
+  background: oklch(var(--card-l) var(--card-c) var(--h)); color: var(--ink);
+  display: grid; grid-template-rows: auto 1fr auto; gap: 4px; scroll-snap-align: center;
+  position: relative;
+}
+.card .yr { font: 800 26px/1 var(--f-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.card .ar { font-size: 12px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.card .ti { font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; opacity: .85; }
+.card.mystery { background: var(--vinyl); color: #fff; place-items: center; grid-template-rows: 1fr; }
+.card.mystery span { font: 800 34px var(--f-display); }
+.card.res-ok { outline: 3px solid var(--ok); outline-offset: 2px; }
+.card.res-bad { outline: 3px dashed var(--bad); outline-offset: 2px; }
+.card.new { animation: pop .45s cubic-bezier(.2,1.4,.4,1); }
+@keyframes pop { from { transform: scale(.6) rotate(-6deg); opacity: 0; } }
+.slot {
+  flex: 0 0 auto; width: 30px; margin: 0 3px; border-radius: 8px; border: 2px dashed var(--line);
+  background: transparent; cursor: pointer; display: grid; place-items: center; color: var(--muted);
+  font: 700 18px var(--f-display); transition: width .15s, background .15s;
+}
+.slot:hover { border-color: var(--muted); }
+.slot.sel-a { width: 52px; border-style: solid; border-color: var(--accent); background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
+.slot.sel-c { width: 52px; border-style: solid; border-color: var(--ink); background: var(--sunken); color: var(--ink); }
+.slot:disabled { cursor: default; opacity: .5; }
+.gap { flex: 0 0 auto; width: 8px; }
+
+/* Turntable */
+.deck { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+@media (max-width: 460px) { .deck { grid-template-columns: 1fr; justify-items: center; text-align: center; } .deck .row { justify-content: center; } }
+.vinyl-box { position: relative; width: 168px; height: 168px; }
+#yt-holder { position: absolute; inset: 0; overflow: hidden; border-radius: 50%; }
+#yt-holder iframe { width: 200px; height: 200px; pointer-events: none; }
+.vinyl {
+  position: absolute; inset: 0; border-radius: 50%; border: 0; cursor: pointer; padding: 0;
+  background:
+    radial-gradient(circle at center, var(--accent) 0 21%, var(--vinyl) 21.5% 23%, transparent 23.5%),
+    repeating-radial-gradient(circle at center, var(--vinyl) 0 2px, var(--vinyl-groove) 2.5px 3px);
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / .5);
+  display: grid; place-items: center;
+}
+.vinyl::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--bg); }
+.vinyl .glyph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--accent-ink); }
+.vinyl .glyph svg { width: 26px; height: 26px; }
+.spin .vinyl { animation: spin 3.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin .vinyl, .card.new { animation: none; } }
+.status { display: grid; gap: 8px; min-width: 0; }
+.status h3 { font-size: 20px; }
+.status p { margin: 0; color: var(--muted); }
+
+/* Reveal panel */
+.reveal { border-radius: var(--r); padding: 16px; display: grid; gap: 10px; border: 2px solid var(--line); background: var(--surface); }
+.reveal.ok { border-color: var(--ok); }
+.reveal.bad { border-color: var(--bad); }
+.reveal .verdict { font: 700 18px var(--f-display); }
+.reveal.ok .verdict { color: var(--ok); }
+.reveal.bad .verdict { color: var(--bad); }
+.reveal .big { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.reveal .big .yr { font: 800 40px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.reveal .big .who { font-weight: 600; font-size: 18px; }
+.reveal a { color: var(--accent); }
+.toggle { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; font-weight: 500; }
+.toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+.challenge { display: grid; gap: 8px; padding: 12px; border-radius: var(--r); background: var(--sunken); }
+
+/* Handoff & win */
+.center-screen { min-height: 70vh; display: grid; place-content: center; text-align: center; gap: 18px; justify-items: center; }
+.center-screen h1 { font-size: clamp(32px, 8vw, 52px); }
+.center-screen h1 em { font-style: normal; color: var(--accent); }
+.final { display: grid; gap: 14px; width: 100%; }
+.final .timeline { min-height: 0; }
+.notice { font-size: 14px; color: var(--muted); }
+
+/* Report dialog and list */
+dialog.sheet {
+  border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--ink);
+  padding: 16px; width: min(480px, calc(100vw - 32px));
+}
+dialog.sheet::backdrop { background: rgb(0 0 0 / .45); }
+dialog.sheet form { display: grid; gap: 12px; }
+dialog.sheet .notice { margin: 0; }
+.reasons { display: grid; gap: 10px; }
+#report-comment {
+  font: inherit; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line);
+  background: var(--bg); color: var(--ink); resize: vertical; width: 100%;
+}
+.reports { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; max-height: 240px; overflow-y: auto; }
+.err { color: var(--bad); font-weight: 600; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="orn" width="28" height="14" patternUnits="userSpaceOnUse">
+      <path d="M14 1 L21 7 L14 13 L7 7 Z M14 4.5 L17.5 7 L14 9.5 L10.5 7 Z M0 7 L3 4 L6 7 L3 10 Z M22 7 L25 4 L28 7 L25 10 Z" fill="currentColor" fill-rule="evenodd"/>
+    </pattern>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <svg class="band" aria-hidden="true"><rect width="100%" height="14" fill="url(#orn)"/></svg>
+
+  <!-- SETUP -->
+  <section id="setup" class="wrap" style="padding:0">
+    <div class="hero">
+      <div class="label">Беларуская музычная гульня</div>
+      <h1>Песенная <span>стужка</span></h1>
+      <p>Слухай песню, не бачачы назвы, і стаў яе на сваю стужку часу: раней ці пазней за тыя, што ўжо ляжаць. Хто першы збярэ патрэбную колькасць картак, той выйграў.</p>
+    </div>
+
+    <div class="panel" id="resume-panel" hidden>
+      <div class="row">
+        <div class="grow"><b>Ёсць незавершаная гульня.</b> <span class="muted" id="resume-info"></span></div>
+        <button class="btn primary" id="btn-resume">Працягнуць</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="label">Гульцы ці каманды</div>
+      <div class="players" id="players"></div>
+      <div><button class="btn ghost small" id="btn-add-player">+ Дадаць гульца</button></div>
+    </div>
+
+    <div class="panel">
+      <div class="opts">
+        <label class="opt"><span class="label">Картак для перамогі</span>
+          <select id="opt-target"><option>5</option><option>8</option><option selected>10</option><option>12</option><option>15</option></select>
+        </label>
+        <label class="opt"><span class="label">Адкуль граць</span>
+          <select id="opt-start"><option value="mid">З сярэдзіны (адразу прыпеў)</option><option value="start">З пачатку</option></select>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <div class="label grow">Якія песні гуляюць</div>
+        <button class="btn ghost small" id="btn-clear-filters">Усе песні</button>
+      </div>
+      <p class="notice" style="margin:0">Нічога не выбрана ў групе — значыць, падыходзіць усё. Унутры групы дастаткова любога тэга, паміж групамі павінны супасці ўсе.</p>
+      <label class="toggle" id="hits-toggle" hidden><input type="checkbox" id="opt-hits"> Толькі хіты <span class="muted" id="hits-count"></span></label>
+      <div class="filters" id="filters"></div>
+      <div style="display:grid;gap:8px">
+        <div class="label" id="deck-info"></div>
+        <div class="hist" id="hist"></div>
+      </div>
+    </div>
+
+    <div class="row end">
+      <span class="err" id="setup-err"></span>
+      <button class="btn primary" id="btn-start">Пачаць гульню</button>
+    </div>
+
+    <div class="panel" id="reports-panel" hidden>
+      <div class="label">Заўвагі пра песні · <span id="reports-count"></span></div>
+      <p class="notice" style="margin:0">Захоўваюцца толькі ў гэтым браўзеры. Скапіруйце ці спампуйце іх і перашліце таму, хто вядзе спіс песень.</p>
+      <ul class="reports" id="reports-list"></ul>
+      <div class="row">
+        <button class="btn small ghost" id="reports-copy">Скапіраваць</button>
+        <button class="btn small ghost" id="reports-download">Спампаваць</button>
+        <button class="btn small ghost" id="reports-clear">Ачысціць</button>
+      </div>
+    </div>
+
+    <div class="panel donate" id="donate-panel" hidden>
+      <div class="row">
+        <p class="grow" style="margin:0">Гульня бясплатная. Калі спадабалася, можна падтрымаць аўтара.</p>
+        <a class="btn primary small" id="donate-link" target="_blank" rel="noopener">Падтрымаць</a>
+      </div>
+    </div>
+
+    <details class="rules">
+      <summary>Правілы</summary>
+      <ol>
+        <li>У кожнага гульца на пачатку адна адкрытая картка з годам і 2 жэтоны.</li>
+        <li>На сваім ходзе гуляе песня. Назву не відаць. Выберы месца на сваёй стужцы, дзе гэтая песня павінна стаяць па годзе выхаду.</li>
+        <li>Пасля таго як ты выбраў месца, іншы гулец можа аспрэчыць: аддае жэтон і выбірае іншае месца. Калі ты памыліўся, а ён не, картка дастаецца яму.</li>
+        <li>Адкрываем картку. Калі месца правільнае, картка застаецца ў цябе. Песні аднаго года можна ставіць у любым парадку.</li>
+        <li>Назваў выканаўцу і назву? Атрымай +1 жэтон (не больш за 5).</li>
+        <li>Жэтон можна аддаць, каб прапусціць песню.</li>
+        <li>Перамагае першы, хто збярэ патрэбную колькасць картак.</li>
+      </ol>
+    </details>
+  </section>
+
+  <!-- HANDOFF -->
+  <section id="handoff" class="center-screen" hidden>
+    <div class="label">Перадайце тэлефон</div>
+    <h1>Ходзіць <em id="handoff-name"></em></h1>
+    <p class="muted" id="handoff-info"></p>
+    <button class="btn primary" id="btn-turn">Пачаць ход</button>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" class="wrap" style="padding:0" hidden>
+    <div class="score" id="score"></div>
+
+    <div>
+      <div class="tl-head">
+        <h2 id="tl-title"></h2>
+        <span class="notice" id="tl-hint"></span>
+      </div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <div class="deck" id="deck">
+      <div class="vinyl-box" id="vinyl-box">
+        <div id="yt-holder"><div id="yt"></div></div>
+        <button class="vinyl" id="btn-play" aria-label="Граць ці паўза"><span class="glyph" id="play-glyph"></span></button>
+      </div>
+      <div class="status">
+        <h3 id="st-title">Націсні на пласцінку</h3>
+        <p id="st-text">Песня пачне гучаць. Потым выберы месца на стужцы.</p>
+        <div class="row">
+          <button class="btn small ghost" id="btn-fwd">+15 с</button>
+          <button class="btn small ghost" id="btn-skip">Прапусціць · 1 жэтон</button>
+          <button class="btn small ghost" id="btn-report">Нешта не так</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="challenge" id="challenge" hidden></div>
+
+    <div class="reveal" id="reveal" hidden></div>
+
+    <div class="row end" id="actions"></div>
+
+    <div class="row"><button class="btn small ghost" id="btn-quit">Скончыць гульню</button></div>
+  </section>
+
+  <!-- WIN -->
+  <section id="win" class="center-screen" hidden>
+    <div class="label">Гульня скончана</div>
+    <h1 id="win-title"></h1>
+    <div class="final" id="final"></div>
+    <button class="btn primary" id="btn-new">Новая гульня</button>
+  </section>
+</div>
+
+<dialog class="sheet" id="report-dlg" aria-labelledby="report-h">
+  <form id="report-form" method="dialog">
+    <h3 id="report-h">Што не так з гэтай песняй?</h3>
+    <p class="notice">Назву не пакажам, калі картка яшчэ не адкрытая.</p>
+    <div class="reasons" id="report-reasons"></div>
+    <textarea id="report-comment" rows="3" maxlength="500" placeholder="Каментар, напрыклад правільны год"></textarea>
+    <div class="row end">
+      <button type="button" class="btn ghost small" id="report-cancel">Адмяніць</button>
+      <button type="submit" class="btn primary small">Захаваць</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="songs.js"></script>
+<script>
+(() => {
+  const SAVE_KEY = 'stuzhka-save-v1';
+  const PREF_KEY = 'stuzhka-prefs-v1';
+  const MAX_TOKENS = 5;
+  const DONATE_URL = ''; // спасылка на старонку данатаў; пакуль пустая, кнопка схаваная
+  const SONGS = (window.SONGS || []).filter(s => s.yt && s.year);
+  const BY_ID = new Map(SONGS.map(s => [s.yt, s]));
+  const $ = s => document.querySelector(s);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') n.className = v;
+      else if (k === 'style') n.style.cssText = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else if (v !== false && v != null) n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const k of kids.flat()) if (k != null) n.append(k.nodeType ? k : document.createTextNode(k));
+    return n;
+  };
+  const song = id => BY_ID.get(id);
+  const hue = y => (20 + (y - 1960) * 4.6) % 360;
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
+  };
+  const plural = (n, one, few, many) => {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  };
+
+  let S = null; // game state
+
+  /* ---------- SETUP ---------- */
+  const prefs = store.get(PREF_KEY) || { names: ['Гулец 1', 'Гулец 2'], target: '10', start: 'mid' };
+  $('#opt-target').value = prefs.target; $('#opt-start').value = prefs.start;
+
+  // Tag groups for deck filtering: OR inside a group, AND across groups, empty group = everything.
+  const LANGS = { be: 'Па-беларуску', ru: 'Па-руску', en: 'Па-англійску' };
+  const GENRE_ORDER = ['Поп', 'Рок', 'Эстрада', 'Фолк', 'Хіп-хоп', 'Інды', 'Метал'];
+  const songGroups = s => ({
+    lang: [LANGS[s.lang] || 'Іншая мова'],
+    genre: (s.tags || []).filter(t => GENRE_ORDER.includes(t)),
+  });
+  const FILTER_GROUPS = [['lang', 'Мова'], ['genre', 'Жанр']];
+  const tagCounts = {};
+  for (const s of SONGS) for (const [g, vals] of Object.entries(songGroups(s))) for (const v of vals) {
+    tagCounts[g] = tagCounts[g] || {}; tagCounts[g][v] = (tagCounts[g][v] || 0) + 1;
+  }
+  const order = (g, vals) => g === 'genre' ? GENRE_ORDER.filter(v => vals.includes(v)) : Object.values(LANGS).filter(v => vals.includes(v));
+  prefs.filters = prefs.filters || {};
+  for (const [g] of FILTER_GROUPS) prefs.filters[g] = (prefs.filters[g] || []).filter(v => tagCounts[g] && tagCounts[g][v]);
+
+  function renderFilters() {
+    const box = $('#filters'); box.innerHTML = '';
+    for (const [g, title] of FILTER_GROUPS) {
+      if (!tagCounts[g]) continue;
+      const vals = order(g, Object.keys(tagCounts[g]));
+      box.append(el('div', { class: 'fgroup' }, el('div', { class: 'label' }, title),
+        el('div', { class: 'fchips' }, vals.map(v => el('button', {
+          class: 'fchip', 'aria-pressed': String(prefs.filters[g].includes(v)),
+          onclick: () => {
+            const sel = prefs.filters[g];
+            sel.includes(v) ? sel.splice(sel.indexOf(v), 1) : sel.push(v);
+            store.set(PREF_KEY, prefs); renderFilters(); renderDeckInfo();
+          } }, v, el('small', {}, String(tagCounts[g][v])))))));
+    }
+  }
+  $('#btn-clear-filters').onclick = () => {
+    for (const [g] of FILTER_GROUPS) prefs.filters[g] = [];
+    store.set(PREF_KEY, prefs); renderFilters(); renderDeckInfo();
+  };
+
+  function renderPlayers() {
+    const box = $('#players'); box.innerHTML = '';
+    prefs.names.forEach((name, i) => {
+      box.append(el('div', { class: 'player-input' },
+        el('input', { id: 'player-' + i, value: name, maxlength: 20, 'aria-label': 'Імя гульца ' + (i + 1),
+          oninput: e => { prefs.names[i] = e.target.value; store.set(PREF_KEY, prefs); } }),
+        el('button', { class: 'icon-btn', 'aria-label': 'Выдаліць', disabled: prefs.names.length <= 1,
+          onclick: () => { prefs.names.splice(i, 1); store.set(PREF_KEY, prefs); renderPlayers(); } }, '×')));
+    });
+    $('#btn-add-player').disabled = prefs.names.length >= 8;
+  }
+  $('#btn-add-player').onclick = () => { prefs.names.push('Гулец ' + (prefs.names.length + 1)); store.set(PREF_KEY, prefs); renderPlayers(); };
+
+  if (DONATE_URL) { $('#donate-link').href = DONATE_URL; $('#donate-panel').hidden = false; }
+  // On the win screen too: that's when people liked the game the most.
+  if (DONATE_URL) $('#btn-new').before(el('a', { class: 'btn ghost', href: DONATE_URL, target: '_blank', rel: 'noopener' }, 'Падтрымаць аўтара'));
+
+  // "Толькі хіты": songs marked hit: true in songs.js; the toggle shows up once any are marked.
+  const HITS = SONGS.filter(s => s.hit).length;
+  $('#hits-toggle').hidden = !HITS;
+  $('#hits-count').textContent = String(HITS);
+  $('#opt-hits').checked = !!prefs.hitsOnly && HITS > 0;
+  $('#opt-hits').onchange = e => { prefs.hitsOnly = e.target.checked; store.set(PREF_KEY, prefs); renderDeckInfo(); };
+
+  const pool = () => SONGS.filter(s => {
+    if (prefs.hitsOnly && HITS && !s.hit) return false;
+    const sg = songGroups(s);
+    return FILTER_GROUPS.every(([g]) => !prefs.filters[g].length || sg[g].some(v => prefs.filters[g].includes(v)));
+  });
+  function renderDeckInfo() {
+    const p = pool();
+    const years = p.map(s => s.year);
+    const min = Math.min(...years), max = Math.max(...years);
+    $('#deck-info').textContent = p.length
+      ? `Калода: ${p.length} ${plural(p.length, 'песня', 'песні', 'песень')}, ${min}–${max}`
+      : 'Калода пустая';
+    const decades = {};
+    for (const y of years) { const d = Math.floor(y / 10) * 10; decades[d] = (decades[d] || 0) + 1; }
+    const keys = Object.keys(decades).map(Number).sort((a, b) => a - b);
+    const top = Math.max(1, ...Object.values(decades));
+    const h = $('#hist'); h.innerHTML = ''; h.style.setProperty('--n', keys.length || 1);
+    for (const d of keys) {
+      h.append(el('div', { class: 'bar', title: `${d}-я: ${decades[d]}` },
+        el('b', {}, String(decades[d])),
+        el('i', { style: `height:${Math.round(52 * decades[d] / top)}px;background:oklch(var(--card-l) calc(var(--card-c) * 2) ${hue(d + 5)})` }),
+        el('small', {}, `${String(d).slice(2)}-я`)));
+    }
+  }
+  for (const id of ['#opt-target', '#opt-start']) $(id).onchange = () => {
+    prefs.target = $('#opt-target').value; prefs.start = $('#opt-start').value;
+    store.set(PREF_KEY, prefs);
+  };
+
+  function newGame() {
+    const names = prefs.names.map(n => n.trim()).filter(Boolean);
+    const deck = shuffle(pool().map(s => s.yt));
+    const target = Number(prefs.target);
+    if (names.length < 1) return showErr('Дадайце хаця б аднаго гульца.');
+    if (deck.length < names.length * (target + 2)) return showErr('Замала песень для такой гульні. Паменшыце колькасць картак ці гульцоў.');
+    S = {
+      players: names.map(name => ({ name, timeline: [deck.pop()], tokens: 2 })),
+      target, start: prefs.start, deck, current: 0, view: 0, turn: null, winner: null,
+    };
+    save(); showHandoff();
+  }
+  function showErr(t) { $('#setup-err').textContent = t; }
+  $('#btn-start').onclick = () => { ensurePlayer(); newGame(); };
+
+  /* ---------- STATE ---------- */
+  function save() { store.set(SAVE_KEY, S); }
+  function show(id) { for (const s of ['setup', 'handoff', 'game', 'win']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
+  const cur = () => S.players[S.current];
+
+  function showHandoff() {
+    stopAudio();
+    const p = cur();
+    $('#handoff-name').textContent = p.name;
+    $('#handoff-info').textContent = `${p.timeline.length} з ${S.target} ${plural(S.target, 'карткі', 'картак', 'картак')} · ${p.tokens} ${plural(p.tokens, 'жэтон', 'жэтоны', 'жэтонаў')}`;
+    show('handoff');
+  }
+  $('#btn-turn').onclick = () => { ensurePlayer(); startTurn(); };
+
+  function draw() {
+    if (!S.deck.length) return null;
+    return S.deck.pop();
+  }
+  function startTurn() {
+    if (!S.turn) {
+      const id = draw();
+      if (!id) return finish(true);
+      S.turn = { song: id, slot: null, challenger: null, cslot: null, picking: 'active', revealed: false, bonus: false, error: false };
+    }
+    S.view = S.current;
+    save(); show('game'); render();
+    if (!S.turn.revealed) cueSong();
+  }
+
+  function fits(timeline, slot, year) {
+    const ys = timeline.map(id => song(id).year);
+    return (slot === 0 || ys[slot - 1] <= year) && (slot === ys.length || year <= ys[slot]);
+  }
+  function insertSorted(timeline, id) {
+    const y = song(id).year;
+    let i = 0; while (i < timeline.length && song(timeline[i]).year <= y) i++;
+    timeline.splice(i, 0, id);
+  }
+
+  function reveal() {
+    const t = S.turn, p = cur(), y = song(t.song).year;
+    t.revealed = true;
+    t.ok = fits(p.timeline, t.slot, y);
+    t.cok = t.challenger != null && fits(p.timeline, t.cslot, y);
+    if (t.ok) p.timeline.splice(t.slot, 0, t.song);
+    else if (t.cok) insertSorted(S.players[t.challenger].timeline, t.song);
+    save(); render();
+  }
+
+  function endTurn() {
+    const t = S.turn;
+    if (t && t.bonus) cur().tokens = Math.min(MAX_TOKENS, cur().tokens + 1);
+    S.turn = null;
+    const w = S.players.find(p => p.timeline.length >= S.target);
+    if (w) return finish(false);
+    S.current = (S.current + 1) % S.players.length;
+    save(); showHandoff();
+  }
+
+  function finish(deckEmpty) {
+    stopAudio();
+    const best = Math.max(...S.players.map(p => p.timeline.length));
+    const winners = S.players.filter(p => p.timeline.length === best);
+    $('#win-title').textContent = winners.length === 1 ? `Перамагае ${winners[0].name}!` : `Нічыя: ${winners.map(w => w.name).join(', ')}`;
+    const f = $('#final'); f.innerHTML = '';
+    if (deckEmpty) f.append(el('p', { class: 'muted' }, 'Песні ў калодзе скончыліся.'));
+    for (const p of [...S.players].sort((a, b) => b.timeline.length - a.timeline.length)) {
+      const row = el('div', { class: 'timeline' });
+      p.timeline.forEach(id => row.append(cardEl(song(id))));
+      f.append(el('div', { style: 'text-align:left;min-width:0' }, el('div', { class: 'label' }, `${p.name} · ${p.timeline.length}`), row));
+    }
+    store.del(SAVE_KEY);
+    S = null;
+    show('win');
+  }
+  $('#btn-new').onclick = () => { boot(); };
+  $('#btn-quit').onclick = () => {
+    const b = $('#btn-quit');
+    if (b.dataset.armed) { finish(false); return; }
+    b.dataset.armed = '1'; b.textContent = 'Націсні яшчэ раз, каб скончыць';
+    setTimeout(() => { delete b.dataset.armed; b.textContent = 'Скончыць гульню'; }, 3000);
+  };
+
+  /* ---------- RENDER ---------- */
+  function cardEl(s, extra = '') {
+    return el('div', { class: 'card ' + extra, style: `--h:${hue(s.year)}` },
+      el('div', { class: 'yr' }, String(s.year)),
+      el('div', { class: 'ar' }, s.artist),
+      el('div', { class: 'ti' }, s.title));
+  }
+
+  function render() {
+    const t = S.turn, p = cur();
+    const viewing = S.players[S.view];
+
+    // scoreboard
+    const sc = $('#score'); sc.innerHTML = '';
+    S.players.forEach((pl, i) => {
+      sc.append(el('button', { class: 'chip' + (i === S.current ? ' cur' : '') + (i === S.view ? ' viewing' : ''),
+        onclick: () => { S.view = i; render(); } },
+        el('span', {}, pl.name), el('b', {}, `${pl.timeline.length}/${S.target}`),
+        el('span', { class: 'tokens', 'aria-label': pl.tokens + ' жэтонаў' }, Array.from({ length: pl.tokens }, () => el('i')))));
+    });
+
+    // timeline
+    const own = S.view === S.current;
+    $('#tl-title').textContent = own ? `Стужка: ${p.name}` : `Стужка: ${viewing.name} (толькі прагляд)`;
+    const picking = own && !t.revealed;
+    $('#tl-hint').textContent = picking
+      ? (t.picking === 'challenger' ? `${S.players[t.challenger].name} выбірае іншае месца` : 'Выберы месца для песні')
+      : '';
+    const tl = $('#timeline'); tl.innerHTML = '';
+    const list = viewing.timeline;
+    if (picking) {
+      for (let i = 0; i <= list.length; i++) {
+        const isA = t.slot === i, isC = t.cslot === i;
+        const disabled = t.picking === 'challenger' && isA;
+        tl.append(el('button', { class: 'slot' + (isA ? ' sel-a' : '') + (isC ? ' sel-c' : ''), disabled,
+          'aria-label': 'Месца ' + (i + 1), onclick: () => pickSlot(i) }, isA || isC ? '?' : '+'));
+        if (i < list.length) tl.append(cardEl(song(list[i])));
+      }
+    } else {
+      list.forEach((id, i) => {
+        if (i) tl.append(el('span', { class: 'gap' }));
+        const isNew = own && t.revealed && t.ok && id === t.song;
+        tl.append(cardEl(song(id), isNew ? 'res-ok new' : ''));
+      });
+      if (own && t.revealed && !t.ok) {
+        tl.append(el('span', { class: 'gap' }), cardEl(song(t.song), 'res-bad new'));
+      }
+    }
+    requestAnimationFrame(() => {
+      const sel = tl.querySelector('.sel-c, .sel-a, .new');
+      if (sel) sel.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    });
+
+    // deck controls
+    $('#btn-skip').disabled = t.revealed || p.tokens < 1;
+    $('#btn-report').textContent = t.reported ? 'Заўвага захаваная' : 'Нешта не так';
+    $('#btn-fwd').disabled = !t.song;
+    renderStatus();
+
+    // challenge
+    const ch = $('#challenge');
+    ch.hidden = !(own && !t.revealed && t.slot != null && t.picking !== 'challenger' && t.challenger == null);
+    if (!ch.hidden) {
+      ch.innerHTML = '';
+      const others = S.players.map((pl, i) => ({ pl, i })).filter(o => o.i !== S.current);
+      ch.append(el('div', { class: 'label' }, 'Хтосьці не згодны? Аспрэчыць за 1 жэтон'));
+      ch.append(el('div', { class: 'row' }, others.map(({ pl, i }) =>
+        el('button', { class: 'btn small ghost', disabled: pl.tokens < 1,
+          onclick: () => { pl.tokens--; t.challenger = i; t.picking = 'challenger'; save(); render(); } }, pl.name))));
+    }
+
+    // reveal
+    const rv = $('#reveal');
+    rv.hidden = !t.revealed;
+    if (t.revealed) {
+      const s = song(t.song);
+      rv.className = 'reveal ' + (t.ok ? 'ok' : 'bad');
+      rv.innerHTML = '';
+      let verdict;
+      if (t.ok) verdict = t.challenger != null ? `Правільна! ${S.players[t.challenger].name} губляе жэтон.` : 'Правільна! Картка твая.';
+      else if (t.cok) verdict = `Міма. Картку забірае ${S.players[t.challenger].name}.`;
+      else verdict = 'Міма. Картка адыходзіць.';
+      rv.append(
+        el('div', { class: 'verdict' }, verdict),
+        el('div', { class: 'big' }, el('span', { class: 'yr' }, String(s.year)),
+          el('span', {}, el('div', { class: 'who' }, s.artist), el('div', {}, s.title))),
+        el('label', { class: 'toggle' },
+          el('input', { type: 'checkbox', id: 'bonus', checked: t.bonus, disabled: p.tokens >= MAX_TOKENS,
+            onchange: e => { t.bonus = e.target.checked; save(); } }),
+          p.tokens >= MAX_TOKENS ? 'Жэтонаў ужо максімум' : `Выканаўца і назва адгаданыя: +1 жэтон для ${p.name}`),
+        el('div', { class: 'row' },
+          el('a', { href: `https://www.youtube.com/watch?v=${s.yt}`, target: '_blank', rel: 'noopener' }, 'Адкрыць на YouTube'),
+          s.spotify ? el('a', { href: s.spotify, target: '_blank', rel: 'noopener' }, 'Spotify') : null));
+    }
+
+    // actions
+    const ac = $('#actions'); ac.innerHTML = '';
+    if (!t.revealed) {
+      const ready = t.picking === 'challenger' ? t.cslot != null : t.slot != null;
+      if (t.picking === 'challenger') {
+        ac.append(el('button', { class: 'btn ghost', onclick: () => {
+          S.players[t.challenger].tokens++; t.challenger = null; t.cslot = null; t.picking = 'active'; save(); render();
+        } }, 'Адмяніць спрэчку'));
+      }
+      ac.append(el('button', { class: 'btn primary', disabled: !ready || !own, onclick: reveal }, 'Адкрыць картку'));
+    } else {
+      ac.append(el('button', { class: 'btn primary', onclick: endTurn }, 'Наступны ход'));
+    }
+  }
+
+  function renderStatus() {
+    const t = S.turn;
+    if (t.revealed) { $('#st-title').textContent = 'Картка адкрыта'; $('#st-text').textContent = 'Можна даслухаць песню.'; }
+    else if (t.error) { $('#st-title').textContent = 'Відэа не грае'; $('#st-text').textContent = 'Гэтае відэа недаступнае. Прапусці песню бясплатна.'; }
+    else if (!playing) { $('#st-title').textContent = 'Націсні на пласцінку'; $('#st-text').textContent = 'Песня пачне гучаць. Потым выберы месца на стужцы.'; }
+    else { $('#st-title').textContent = 'Гучыць...'; $('#st-text').textContent = 'Слухай і выбірай месца на стужцы.'; }
+    $('#btn-skip').textContent = t.error ? 'Іншая песня · бясплатна' : 'Прапусціць · 1 жэтон';
+    if (t.error) $('#btn-skip').disabled = false;
+  }
+
+  function pickSlot(i) {
+    const t = S.turn;
+    if (t.picking === 'challenger') t.cslot = i; else t.slot = i;
+    save(); render();
+  }
+
+  $('#btn-skip').onclick = () => {
+    const t = S.turn, p = cur();
+    if (!t.error) { if (p.tokens < 1) return; p.tokens--; }
+    if (t.challenger != null) S.players[t.challenger].tokens++;
+    const id = draw();
+    if (!id) return finish(true);
+    S.turn = { song: id, slot: null, challenger: null, cslot: null, picking: 'active', revealed: false, bonus: false, error: false };
+    save(); render(); cueSong(true);
+  };
+  /* ---------- REPORTS ("Нешта не так") ---------- */
+  // Kept in this browser only; the setup screen lets you copy or download them.
+  const REPORT_KEY = 'stuzhka-reports-v1';
+  const REASONS = ['Няправільны год', 'Не грае ці дрэнны гук', 'Не тая песня ці выканаўца', 'Кавер ці не арыгінальны запіс', 'Не беларуская', 'Іншае'];
+  const reports = () => store.get(REPORT_KEY) || [];
+  $('#btn-report').onclick = () => {
+    const box = $('#report-reasons'); box.innerHTML = '';
+    REASONS.forEach((r, i) => box.append(el('label', { class: 'toggle' },
+      el('input', { type: 'radio', name: 'reason', value: r, checked: i === 0 }), r)));
+    $('#report-comment').value = '';
+    $('#report-dlg').showModal();
+  };
+  $('#report-cancel').onclick = () => $('#report-dlg').close();
+  $('#report-form').onsubmit = e => {
+    e.preventDefault();
+    const s = song(S.turn.song);
+    const list = reports();
+    list.push({ yt: s.yt, artist: s.artist, title: s.title, year: s.year,
+      reason: $('#report-form').reason.value, comment: $('#report-comment').value.trim(), at: new Date().toISOString().slice(0, 16) });
+    store.set(REPORT_KEY, list);
+    S.turn.reported = true; save();
+    $('#report-dlg').close(); render();
+  };
+  const reportText = list => list.map(r =>
+    `${r.artist} — ${r.title} (${r.year}) [${r.yt}]: ${r.reason}${r.comment ? '. ' + r.comment : ''}`).join('\n');
+  function renderReports() {
+    const list = reports();
+    $('#reports-panel').hidden = !list.length;
+    $('#reports-count').textContent = list.length;
+    const ul = $('#reports-list'); ul.innerHTML = '';
+    for (const r of list) ul.append(el('li', {}, el('b', {}, `${r.artist} — ${r.title}`), ` (${r.year}): ${r.reason}${r.comment ? '. ' + r.comment : ''}`));
+  }
+  $('#reports-copy').onclick = async () => {
+    const b = $('#reports-copy');
+    try { await navigator.clipboard.writeText(reportText(reports())); b.textContent = 'Скапіравана'; }
+    catch { b.textContent = 'Не атрымалася'; }
+    setTimeout(() => { b.textContent = 'Скапіраваць'; }, 2000);
+  };
+  $('#reports-download').onclick = () => {
+    const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(reports(), null, 1)], { type: 'application/json' })),
+      download: 'stuzhka-zauvagi.json' });
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $('#reports-clear').onclick = () => {
+    const b = $('#reports-clear');
+    if (b.dataset.armed) { store.del(REPORT_KEY); renderReports(); return; }
+    b.dataset.armed = '1'; b.textContent = 'Націсні яшчэ раз';
+    setTimeout(() => { delete b.dataset.armed; b.textContent = 'Ачысціць'; }, 3000);
+  };
+
+  /* ---------- AUDIO (hidden YouTube player) ---------- */
+  let yt = null, ytReady = false, loadedId = null, playing = false, seekedFor = null, wantPlay = false;
+  const PLAY_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  const PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+  function setPlaying(v) {
+    playing = v;
+    $('#vinyl-box').classList.toggle('spin', v);
+    $('#play-glyph').innerHTML = v ? PAUSE_SVG : PLAY_SVG;
+    if (S && S.turn) renderStatus();
+  }
+  setPlaying(false);
+
+  function ensurePlayer() {
+    if (window.YT || document.getElementById('yt-api')) return;
+    const s = document.createElement('script');
+    s.id = 'yt-api'; s.src = 'https://www.youtube.com/iframe_api';
+    document.head.append(s);
+  }
+  window.onYouTubeIframeAPIReady = () => {
+    yt = new YT.Player('yt', {
+      width: 200, height: 200,
+      playerVars: { controls: 0, disablekb: 1, playsinline: 1, rel: 0, fs: 0, iv_load_policy: 3, origin: location.origin },
+      events: {
+        onReady: () => { ytReady = true; if (wantPlay) cueSong(true); },
+        onStateChange: e => {
+          if (e.data === YT.PlayerState.PLAYING) {
+            setPlaying(true);
+            if (S && S.start === 'mid' && seekedFor !== loadedId) {
+              seekedFor = loadedId;
+              const d = yt.getDuration();
+              if (d > 90) yt.seekTo(Math.round(d * 0.33), true);
+            }
+          } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) setPlaying(false);
+        },
+        onError: () => { setPlaying(false); if (S && S.turn) { S.turn.error = true; save(); render(); } },
+      },
+    });
+  };
+
+  function cueSong(autoplay = false) {
+    if (!S || !S.turn) return;
+    const id = S.turn.song;
+    if (!ytReady) { wantPlay = autoplay; return; }
+    wantPlay = false;
+    if (loadedId !== id) {
+      loadedId = id; seekedFor = null;
+      if (autoplay) yt.loadVideoById(id); else yt.cueVideoById(id);
+    } else if (autoplay) yt.playVideo();
+  }
+  function stopAudio() { if (ytReady) { try { yt.stopVideo(); } catch {} } setPlaying(false); }
+
+  $('#btn-play').onclick = () => {
+    if (!S || !S.turn) return;
+    if (!ytReady) { wantPlay = true; ensurePlayer(); return; }
+    if (loadedId !== S.turn.song) return cueSong(true);
+    if (playing) yt.pauseVideo(); else yt.playVideo();
+  };
+  $('#btn-fwd').onclick = () => { if (ytReady && loadedId) yt.seekTo(yt.getCurrentTime() + 15, true); };
+
+  /* ---------- BOOT ---------- */
+  function boot() {
+    S = store.get(SAVE_KEY);
+    if (S && !S.players?.every(p => p.timeline.every(id => BY_ID.has(id)))) S = null;
+    renderPlayers(); renderFilters(); renderDeckInfo(); renderReports();
+    $('#resume-panel').hidden = !S;
+    if (S) $('#resume-info').textContent = S.players.map(p => `${p.name} ${p.timeline.length}`).join(' · ');
+    show('setup');
+  }
+  $('#btn-resume').onclick = () => { ensurePlayer(); showHandoff(); };
+  boot();
+})();
+</script>
+</body>
+</html>
