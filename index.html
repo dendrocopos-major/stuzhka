@@ -813,7 +813,8 @@ dialog.sheet .notice { margin: 0; }
   // Sent to a Google Form: action is its .../formResponse address, the rest are its entry.N field names.
   // Until the form is set, the button only shows with ?admin=1 and reports stay in this browser
   // (the setup screen lets you copy or download them).
-  const REPORT_FORM = { action: '', song: '', id: '', reason: '', comment: '' };
+  const REPORT_FORM = { action: 'https://docs.google.com/forms/d/e/1FAIpQLSciEOfbok6XKifRnycKxXNkklViXGv8xxH2B86ihpjXBLhB4Q/formResponse',
+    song: 'entry.1288453177', id: 'entry.1466619795', reason: 'entry.1283972726', comment: 'entry.1077813576' };
   const ADMIN = new URLSearchParams(location.search).get('admin') === '1';
   $('#btn-report').hidden = !(REPORT_FORM.action || ADMIN);
   $('#report-send').textContent = REPORT_FORM.action ? 'Адправіць' : 'Захаваць';
