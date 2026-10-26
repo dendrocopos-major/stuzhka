@@ -576,15 +576,30 @@ dialog.sheet .notice { margin: 0; }
     store.set(PREF_KEY, prefs);
   };
 
+  // One song per artist in a game: cards by an artist who has already played are skipped,
+  // and an artist repeats only when nobody new is left in the deck.
+  const artistKeys = id => (song(id)?.artist || '').toLowerCase()
+    .split(/\s*(?:&|,|\s+і\s+|\s+и\s+|\s+feat\.?\s+|\s+x\s+)\s*/).filter(Boolean);
+  function drawFrom(deck, played) {
+    if (!deck.length) return null;
+    const used = new Set(played.flatMap(artistKeys));
+    let i = deck.length - 1;
+    while (i >= 0 && artistKeys(deck[i]).some(k => used.has(k))) i--;
+    const id = i >= 0 ? deck.splice(i, 1)[0] : deck.pop();
+    played.push(id);
+    return id;
+  }
+
   function newGame() {
     const names = prefs.names.map(n => n.trim()).filter(Boolean);
     const deck = shuffle(pool().map(s => s.yt));
     const target = Number(prefs.target);
     if (names.length < 1) return showErr('Дадайце хаця б аднаго гульца.');
     if (deck.length < names.length * (target + 2)) return showErr('Замала песень для такой гульні. Паменшыце колькасць картак ці гульцоў.');
+    const played = [];
     S = {
-      players: names.map(name => ({ name, timeline: [deck.pop()], tokens: 3 })),
-      target, start: prefs.start, deck, current: 0, view: 0, turn: null, winner: null,
+      players: names.map(name => ({ name, timeline: [drawFrom(deck, played)], tokens: 3 })),
+      target, start: prefs.start, deck, played, current: 0, view: 0, turn: null, winner: null,
     };
     save(); showHandoff();
   }
@@ -609,8 +624,9 @@ dialog.sheet .notice { margin: 0; }
   $('#btn-turn').onclick = () => { ensurePlayer(); startTurn(); };
 
   function draw() {
-    if (!S.deck.length) return null;
-    return S.deck.pop();
+    // Games saved before the artist limit have no "played" list: start it from the timelines.
+    if (!S.played) S.played = S.players.flatMap(p => p.timeline);
+    return drawFrom(S.deck, S.played);
   }
   function prepareTurn() {
     if (S.turn) return true;
@@ -811,6 +827,7 @@ dialog.sheet .notice { margin: 0; }
     const t = S.turn;
     if (!t.error) return;
     if (t.challenger != null) S.players[t.challenger].tokens++;
+    S.played = (S.played || []).filter(x => x !== t.song);  // a video that doesn't play doesn't use up its artist
     const id = draw();
     if (!id) return finish(true);
     S.turn = { song: id, slot: null, challenger: null, cslot: null, picking: 'active', revealed: false, bonus: false, error: false };
