@@ -58,6 +58,8 @@ body {
   padding-block: 12px 24px;
   display: flex; flex-direction: column; gap: 16px;
 }
+/* During a game the page widens so more timeline cards fit on a computer screen */
+body.wide .wrap { max-width: 1200px; }
 h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.1; }
 button { font: inherit; color: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
@@ -134,16 +136,16 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
 .tl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .tl-head h2 { font-size: 18px; }
 .timeline {
-  display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 6px 2px 12px;
+  position: relative; display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 6px 2px 12px;
   scroll-snap-type: x proximity; min-height: 150px;
 }
 .card {
-  flex: 0 0 auto; width: 112px; min-height: 136px; border-radius: 10px; padding: 10px;
+  flex: 0 0 auto; width: 96px; min-height: 128px; border-radius: 10px; padding: 8px;
   background: oklch(var(--card-l) var(--card-c) var(--h)); color: var(--ink);
   display: grid; grid-template-rows: auto 1fr auto; gap: 4px; scroll-snap-align: center;
   position: relative;
 }
-.card .yr { font: 800 26px/1 var(--f-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.card .yr { font: 800 24px/1 var(--f-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .card .ar { font-size: 12px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
 .card .ti { font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; opacity: .85; }
 .card.mystery { background: var(--vinyl); color: #fff; place-items: center; grid-template-rows: 1fr; }
@@ -620,7 +622,11 @@ dialog.sheet .notice { margin: 0; }
 
   /* ---------- STATE ---------- */
   function save() { store.set(SAVE_KEY, S); }
-  function show(id) { for (const s of ['setup', 'handoff', 'game', 'win']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
+  function show(id) {
+    for (const s of ['setup', 'handoff', 'game', 'win']) $('#' + s).hidden = s !== id;
+    document.body.classList.toggle('wide', id === 'game');
+    window.scrollTo(0, 0);
+  }
   const cur = () => S.players[S.current];
 
   function showHandoff() {
@@ -738,7 +744,7 @@ dialog.sheet .notice { margin: 0; }
     $('#tl-hint').textContent = picking
       ? (t.picking === 'challenger' ? `${S.players[t.challenger].name} выбірае іншае месца` : 'Выберы месца для песні')
       : '';
-    const tl = $('#timeline'); tl.innerHTML = '';
+    const tl = $('#timeline'), prevScroll = tl.scrollLeft; tl.innerHTML = '';
     const list = viewing.timeline;
     if (picking) {
       for (let i = 0; i <= list.length; i++) {
@@ -758,10 +764,19 @@ dialog.sheet .notice { margin: 0; }
         tl.append(el('span', { class: 'gap' }), cardEl(song(t.song), 'res-bad new'));
       }
     }
-    requestAnimationFrame(() => {
-      const sel = tl.querySelector('.sel-c, .sel-a, .new');
-      if (sel) sel.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    });
+    // Keep the strip where it was across the rebuild, then glide to the chosen slot or the card just revealed
+    // (a missed card goes to the end of the strip, often off screen on a phone).
+    tl.scrollLeft = prevScroll;
+    const sel = tl.querySelector('.sel-c, .sel-a, .new');
+    if (sel) {
+      const left = Math.max(0, sel.offsetLeft - (tl.clientWidth - sel.offsetWidth) / 2);
+      tl.scrollTo({ left, behavior: 'smooth' });
+      // Some browsers drop smooth scrolling (power saving, embedded views): jump there if it didn't happen.
+      setTimeout(() => {
+        const a = sel.getBoundingClientRect(), b = tl.getBoundingClientRect();
+        if (sel.isConnected && (a.left < b.left || a.right > b.right)) tl.scrollLeft = left;
+      }, 600);
+    }
 
     // deck controls
     $('#btn-report').textContent = t.reported ? (REPORT_FORM.action ? 'Заўвага адпраўленая' : 'Заўвага захаваная') : 'Нешта не так';
