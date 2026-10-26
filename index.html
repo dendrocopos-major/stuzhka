@@ -472,15 +472,18 @@ dialog.sheet .notice { margin: 0; }
   let S = null; // game state
 
   /* ---------- SETUP ---------- */
-  const prefs = store.get(PREF_KEY) || { names: ['Гулец 1', 'Гулец 2'], target: '10', start: 'mid' };
+  const ORDINALS = ['Першы', 'Другі', 'Трэці', 'Чацвёрты', 'Пяты', 'Шосты', 'Сёмы', 'Восьмы'];
+  const defaultName = i => `${ORDINALS[i] || i + 1 + '-ы'} гулец`;
+  const prefs = store.get(PREF_KEY) || { names: [defaultName(0), defaultName(1)], target: '10', start: 'mid' };
+  // Names left at the old defaults ("Гулец 1") take the new ones.
+  prefs.names = prefs.names.map((n, i) => /^Гулец \d+$/.test(n.trim()) ? defaultName(i) : n);
   $('#opt-target').value = prefs.target; $('#opt-start').value = prefs.start;
 
   // Tag groups for deck filtering: OR inside a group, AND across groups, empty group = everything.
   const LANGS = { be: 'Па-беларуску', ru: 'Па-руску', en: 'Па-англійску' };
-  const OTHER_LANG = 'На іншых мовах';
   const GENRE_ORDER = ['Поп', 'Рок', 'Эстрада', 'Фолк', 'Хіп-хоп', 'Інды', 'Метал'];
   const songGroups = s => ({
-    lang: [LANGS[s.lang] || OTHER_LANG],
+    lang: LANGS[s.lang] ? [LANGS[s.lang]] : [],  // other languages have no chip: they play only when no language is picked
     genre: (s.tags || []).filter(t => GENRE_ORDER.includes(t)),
   });
   const FILTER_GROUPS = [['lang', 'Мова'], ['genre', 'Жанр']];
@@ -496,7 +499,7 @@ dialog.sheet .notice { margin: 0; }
     }
   }
   countTags();
-  const order = (g, vals) => g === 'genre' ? GENRE_ORDER.filter(v => vals.includes(v)) : [...Object.values(LANGS), OTHER_LANG].filter(v => vals.includes(v));
+  const order = (g, vals) => g === 'genre' ? GENRE_ORDER.filter(v => vals.includes(v)) : Object.values(LANGS).filter(v => vals.includes(v));
   prefs.filters = prefs.filters || {};
   for (const [g] of FILTER_GROUPS) prefs.filters[g] = (prefs.filters[g] || []).filter(v => tagCounts[g] && tagCounts[g][v]);
 
@@ -540,7 +543,7 @@ dialog.sheet .notice { margin: 0; }
     });
     $('#btn-add-player').disabled = prefs.names.length >= 8;
   }
-  $('#btn-add-player').onclick = () => { prefs.names.push('Гулец ' + (prefs.names.length + 1)); store.set(PREF_KEY, prefs); renderPlayers(); };
+  $('#btn-add-player').onclick = () => { prefs.names.push(defaultName(prefs.names.length)); store.set(PREF_KEY, prefs); renderPlayers(); };
 
   // Donations: never offered to players in Belarus, where donating could be treated as "financing extremism".
   let inBelarus = false;
