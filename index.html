@@ -175,23 +175,21 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
   .gap { width: 6px; }
 }
 
-/* Start page on a computer: the intro across the top; below it rules, players, options and the start button on the left
-   and the deck filters on the right,
-   so the whole page fits on one screen */
+.setup-main { display: flex; flex-direction: column; gap: 16px; }
+/* Start page on a computer: the intro across the top; below it rules, players and options on the left and
+   the deck filters on the right, with the start button level with the bottom of the filters, so it all fits on one screen */
 @media (min-width: 900px) {
   #setup {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; align-items: start; align-content: start;
-    grid-template-areas: "hero hero" "rules deck" "resume deck" "players deck" "opts deck" "start deck" "reports reports" "donate donate";
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; align-items: start;
+    grid-template-areas: "hero hero" "main deck" "start deck" "reports reports" "donate donate";
   }
   #setup > .hero { grid-area: hero; }
   #setup > .hero h1 { font-size: 48px; }
   #setup > .hero p { max-width: 100ch; }
-  #setup > .rules { grid-area: rules; }
-  #resume-panel { grid-area: resume; padding-block: 10px; }
-  #players-panel { grid-area: players; }
-  #opts-panel { grid-area: opts; }
-  #start-row { grid-area: start; }
-  #deck-panel { grid-area: deck; }
+  #setup-main { grid-area: main; gap: 12px; }
+  #resume-panel { padding-block: 10px; }
+  #start-row { grid-area: start; align-self: end; }
+  #deck-panel { grid-area: deck; align-self: stretch; align-content: start; }
   #reports-panel { grid-area: reports; }
   #donate-panel { grid-area: donate; }
   #setup > :not([hidden]) { min-width: 0; }
@@ -294,6 +292,7 @@ dialog.sheet .notice { margin: 0; }
       <p>Слухай песню, не бачачы назвы, і стаў яе на сваю стужку часу: раней ці пазней за тыя, што ўжо ляжаць. Хто першы збярэ патрэбную колькасць картак, той выйграў.</p>
     </div>
 
+    <div class="setup-main" id="setup-main">
     <details class="rules">
       <summary>Правілы</summary>
       <ol>
@@ -328,6 +327,7 @@ dialog.sheet .notice { margin: 0; }
           <select id="opt-start"><option value="mid">З сярэдзіны (адразу прыпеў)</option><option value="start">З пачатку</option></select>
         </label>
       </div>
+    </div>
     </div>
 
     <div class="panel" id="deck-panel">
