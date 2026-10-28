@@ -88,6 +88,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .hero h1 { font-size: clamp(34px, 9vw, 58px); font-weight: 800; letter-spacing: -0.02em; }
 .hero h1 span { color: var(--accent); }
 .hero p { margin: 0; max-width: 58ch; color: var(--muted); }
+.donate-btn { justify-self: start; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 14px; }
 .players { display: grid; gap: 8px; }
 .player-input { display: flex; gap: 8px; }
@@ -182,7 +183,7 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
 @media (min-width: 900px) {
   #setup {
     display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; align-items: start;
-    grid-template-areas: "hero hero" "main deck" "start deck" "reports reports" "donate donate";
+    grid-template-areas: "hero hero" "main deck" "start deck" "reports reports";
   }
   #setup > .hero { grid-area: hero; }
   #setup > .hero h1 { font-size: 48px; }
@@ -192,7 +193,9 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
   #start-row { grid-area: start; align-self: end; }
   #deck-panel { grid-area: deck; align-self: stretch; align-content: start; }
   #reports-panel { grid-area: reports; }
-  #donate-panel { grid-area: donate; }
+  /* The donate button sits in the empty top-right corner of the intro, so it adds no height */
+  #setup > .hero { position: relative; }
+  .donate-btn { position: absolute; right: 0; top: 8px; }
   #setup > :not([hidden]) { min-width: 0; }
 }
 /* Laptops with short screens (e.g. 1280×720): a bit tighter, so the start page still fits */
@@ -291,6 +294,7 @@ dialog.sheet .notice { margin: 0; }
       <div class="label">Беларуская музычная гульня ў духу Hitster</div>
       <h1>Песенная <span>стужка</span></h1>
       <p>Слухай песню, не бачачы назвы, і стаў яе на сваю стужку часу: раней ці пазней за тыя, што ўжо ляжаць. Хто першы збярэ патрэбную колькасць картак, той выйграў.</p>
+      <a class="btn ghost small donate-btn" id="donate-link" target="_blank" rel="noopener" hidden title="Гульня бясплатная. Калі спадабалася, можна падтрымаць аўтара">Падтрымаць аўтара</a>
     </div>
 
     <div class="setup-main" id="setup-main">
@@ -358,12 +362,6 @@ dialog.sheet .notice { margin: 0; }
       </div>
     </div>
 
-    <div class="panel donate" id="donate-panel" hidden>
-      <div class="row">
-        <p class="grow" style="margin:0">Гульня бясплатная. Калі спадабалася, можна падтрымаць аўтара.</p>
-        <a class="btn primary small" id="donate-link" target="_blank" rel="noopener">Падтрымаць</a>
-      </div>
-    </div>
   </section>
 
   <!-- HANDOFF -->
@@ -553,7 +551,7 @@ dialog.sheet .notice { margin: 0; }
   function renderDonate() {
     const show = !!DONATE_URL && !inBelarus;
     if (DONATE_URL) $('#donate-link').href = DONATE_URL;
-    $('#donate-panel').hidden = !show;
+    $('#donate-link').hidden = !show;
     if (winDonate) winDonate.hidden = !show;
   }
 
