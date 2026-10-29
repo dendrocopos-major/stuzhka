@@ -191,6 +191,9 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
   #setup > .hero p { max-width: 100ch; }
   #setup-main { grid-area: main; gap: 12px; }
   #resume-panel { padding-block: 10px; }
+  #resume-panel .row { flex-wrap: nowrap; }  /* buttons stay to the right, the text wraps instead */
+  #resume-panel .grow { min-width: 0; }
+  #resume-panel .btn { white-space: nowrap; }
   #start-row { grid-area: start; align-self: end; }
   #deck-panel { grid-area: deck; align-self: stretch; align-content: start; }
   #reports-panel { grid-area: reports; }
@@ -314,6 +317,7 @@ dialog.sheet .notice { margin: 0; }
     <div class="panel" id="resume-panel" hidden>
       <div class="row">
         <div class="grow"><b>Ёсць незавершаная гульня.</b> <span class="muted" id="resume-info"></span></div>
+        <button class="btn ghost" id="btn-discard">Выдаліць</button>
         <button class="btn primary" id="btn-resume">Працягнуць</button>
       </div>
     </div>
@@ -1035,10 +1039,17 @@ dialog.sheet .notice { margin: 0; }
     }
     renderPlayers(); renderHits(); renderFilters(); renderDeckInfo(); renderReports();
     $('#resume-panel').hidden = !S;
-    if (S) $('#resume-info').textContent = S.players.map(p => `${p.name} ${p.timeline.length}`).join(' · ');
+    if (S) $('#resume-info').textContent = S.players.map(p => `${p.name}: ${p.timeline.length}`).join(' · ');
     show('setup');
   }
   $('#btn-resume').onclick = async () => { ensurePlayer(); await regionReady; showHandoff(); };
+  // Deleting the saved game asks for a second tap, like "Скончыць гульню"
+  $('#btn-discard').onclick = () => {
+    const b = $('#btn-discard');
+    if (b.dataset.armed) { store.del(SAVE_KEY); S = null; $('#resume-panel').hidden = true; return; }
+    b.dataset.armed = '1'; b.textContent = 'Выдаліць?';
+    setTimeout(() => { delete b.dataset.armed; b.textContent = 'Выдаліць'; }, 3000);
+  };
   boot();
   ensurePlayer(); // load the YouTube player in advance: creating it on the first tap adds seconds of delay
 })();
