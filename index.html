@@ -558,6 +558,7 @@ dialog.sheet .notice { margin: 0; }
   let inBelarus = false;
   const winDonate = DONATE_URL ? el('a', { class: 'btn ghost', href: DONATE_URL, target: '_blank', rel: 'noopener' }, 'Падтрымаць аўтара') : null;
   if (winDonate) $('#btn-new').before(winDonate); // on the win screen too: that's when people liked the game the most
+  for (const a of [$('#donate-link'), winDonate]) if (a) a.addEventListener('click', () => track('donate-click', 'Націснулі «Падтрымаць аўтара»'));
   function renderDonate() {
     const show = !!DONATE_URL && !inBelarus;
     if (DONATE_URL) $('#donate-link').href = DONATE_URL;
@@ -598,6 +599,17 @@ dialog.sheet .notice { margin: 0; }
   const regionReady = (forced ? Promise.resolve(forced.toUpperCase()) : fetchCountry())
     .then(c => applyRegion(c === 'BY' || (!forced && tz === 'Europe/Minsk')))
     .catch(() => {}); // never block starting a game
+
+  // Statistics (GoatCounter): visits and a few game events, without cookies or stored IP addresses.
+  // Not loaded for players in Belarus: no request to a third-party server from there.
+  const GOATCOUNTER = 'https://stuzhka.goatcounter.com/count'; // пустая — статыстыка выключаная
+  regionReady.then(() => {
+    if (!GOATCOUNTER || inBelarus) return;
+    document.head.append(el('script', { async: true, src: 'https://gc.zgo.at/count.js', 'data-goatcounter': GOATCOUNTER }));
+  });
+  function track(path, title) {
+    try { window.goatcounter?.count?.({ path, title, event: true }); } catch {}
+  }
 
   const pool = () => BASE.filter(s => {
     if (prefs.hitsOnly && HITS && !s.hit) return false;
@@ -653,6 +665,7 @@ dialog.sheet .notice { margin: 0; }
       players: names.map(name => ({ name, timeline: [drawFrom(deck, played)], tokens: 3 })),
       target, start: prefs.start, deck, played, current: 0, view: 0, turn: null, winner: null,
     };
+    track('game-start', `Гульня пачата: ${names.length} гульц., ${target} картак`);
     save(); showHandoff();
   }
   function showErr(t) { $('#setup-err').textContent = t; }
@@ -730,6 +743,7 @@ dialog.sheet .notice { margin: 0; }
 
   function finish(deckEmpty) {
     stopAudio();
+    track('game-finish', 'Гульня скончана');
     const best = Math.max(...S.players.map(p => p.timeline.length));
     const winners = S.players.filter(p => p.timeline.length === best);
     $('#win-title').textContent = winners.length === 1 ? `Перамагае ${winners[0].name}!` : `Нічыя: ${winners.map(w => w.name).join(', ')}`;
