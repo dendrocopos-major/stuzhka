@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Песенная стужка</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="description" content="Беларуская музычная гульня ў духу Hitster: слухай песню і стаў яе на сваю стужку часу па годзе выхаду. Бясплатна, у браўзеры, з аднаго тэлефона ці кампутара.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -438,7 +439,7 @@ dialog.sheet .notice { margin: 0; }
   const SAVE_KEY = 'stuzhka-save-v1';
   const PREF_KEY = 'stuzhka-prefs-v1';
   const MAX_TOKENS = 5;
-  const DONATE_URL = ''; // спасылка на старонку данатаў; пакуль пустая, кнопка схаваная
+  const DONATE_URL = 'https://donate.stripe.com/00weVebbjcQ78ecftQ3cc00'; // Stripe Payment Link акаўнта «Песенная Стужка»; пустая — кнопка схаваная
   const SONGS = (window.SONGS || []).filter(s => s.yt && s.year);
   const BY_ID = new Map(SONGS.map(s => [s.yt, s]));
   const $ = s => document.querySelector(s);
