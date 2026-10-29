@@ -121,8 +121,13 @@ details.rules summary { cursor: pointer; font-weight: 600; }
 details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px; max-width: 64ch; }
 
 /* Scoreboard */
-.score { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-.score::-webkit-scrollbar { display: none; }
+/* All players stay visible: chips wrap onto a second row instead of scrolling off the edge */
+.score { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 600px) {
+  .score { gap: 6px; }
+  .score .chip { padding: 4px 9px; gap: 6px; font-size: 13px; }
+  .score .tokens i { width: 6px; height: 6px; }
+}
 .chip {
   flex: 0 0 auto; border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 12px;
   display: flex; gap: 8px; align-items: center; font-size: 14px; background: var(--surface); cursor: pointer;
