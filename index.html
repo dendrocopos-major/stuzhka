@@ -700,7 +700,7 @@ dialog.sheet .notice { margin: 0; }
     if (S.turn) return true;
     const id = draw();
     if (!id) return false;
-    S.turn = { song: id, slot: null, challenger: null, cslot: null, picking: 'active', revealed: false, bonus: false, error: false };
+    S.turn = { song: id, slot: null, challenges: [], picking: 'active', revealed: false, bonus: false, error: false };
     return true;
   }
   function startTurn() {
@@ -725,9 +725,10 @@ dialog.sheet .notice { margin: 0; }
     const t = S.turn, p = cur(), y = song(t.song).year;
     t.revealed = true;
     t.ok = fits(p.timeline, t.slot, y);
-    t.cok = t.challenger != null && fits(p.timeline, t.cslot, y);
+    // A miss: the card goes to the first challenger (in the order they challenged) whose place was right
+    t.taker = t.ok ? null : t.challenges.find(c => fits(p.timeline, c.slot, y))?.who ?? null;
     if (t.ok) p.timeline.splice(t.slot, 0, t.song);
-    else if (t.cok) insertSorted(S.players[t.challenger].timeline, t.song);
+    else if (t.taker != null) insertSorted(S.players[t.taker].timeline, t.song);
     save(); render();
   }
 
@@ -792,17 +793,20 @@ dialog.sheet .notice { margin: 0; }
     const own = S.view === S.current;
     $('#tl-title').textContent = own ? `Стужка: ${p.name}` : `Стужка: ${viewing.name} (толькі прагляд)`;
     const picking = own && !t.revealed;
+    const chooser = t.picking === 'challenger' ? t.challenges[t.challenges.length - 1] : null;
     $('#tl-hint').textContent = picking
-      ? (t.picking === 'challenger' ? `${S.players[t.challenger].name} выбірае іншае месца` : 'Выберы месца для песні')
+      ? (chooser && chooser.slot == null ? `${S.players[chooser.who].name} выбірае іншае месца` : t.challenges.length ? '' : 'Выберы месца для песні')
       : '';
     const tl = $('#timeline'), prevScroll = tl.scrollLeft; tl.innerHTML = '';
     const list = viewing.timeline;
     if (picking) {
       for (let i = 0; i <= list.length; i++) {
-        const isA = t.slot === i, isC = t.cslot === i;
-        const disabled = t.picking === 'challenger' && isA;
+        const isA = t.slot === i, c = t.challenges.find(c => c.slot === i), isC = !!c;
+        // A challenger may take any place nobody has taken yet; once someone challenges, the active player's place is fixed
+        const disabled = chooser ? isA || (isC && c !== chooser) : t.challenges.length > 0;
         tl.append(el('button', { class: 'slot' + (isA ? ' sel-a' : '') + (isC ? ' sel-c' : ''), disabled,
-          'aria-label': 'Месца ' + (i + 1), onclick: () => pickSlot(i) }, isA || isC ? '?' : '+'));
+          'aria-label': 'Месца ' + (i + 1) + (isC ? ': ' + S.players[c.who].name : ''), title: isC ? S.players[c.who].name : null,
+          onclick: () => pickSlot(i) }, isA ? '?' : isC ? S.players[c.who].name.trim().charAt(0).toUpperCase() : '+'));
         if (i < list.length) tl.append(cardEl(song(list[i])));
       }
     } else {
@@ -836,14 +840,16 @@ dialog.sheet .notice { margin: 0; }
 
     // challenge
     const ch = $('#challenge');
-    ch.hidden = !(own && !t.revealed && t.slot != null && t.picking !== 'challenger' && t.challenger == null);
+    // Everyone else may challenge in turn, each on a place nobody has taken, while free places remain
+    const taken = 1 + t.challenges.length, free = viewing.timeline.length + 1 - taken;
+    const others = S.players.map((pl, i) => ({ pl, i })).filter(o => o.i !== S.current && !t.challenges.some(c => c.who === o.i));
+    ch.hidden = !(own && !t.revealed && t.slot != null && !(chooser && chooser.slot == null) && others.length && free > 0);
     if (!ch.hidden) {
       ch.innerHTML = '';
-      const others = S.players.map((pl, i) => ({ pl, i })).filter(o => o.i !== S.current);
-      ch.append(el('div', { class: 'label' }, 'Хтосьці не згодны? Аспрэчыць за 1 жэтон'));
+      ch.append(el('div', { class: 'label' }, t.challenges.length ? 'Яшчэ хтосьці не згодны? Аспрэчыць за 1 жэтон' : 'Хтосьці не згодны? Аспрэчыць за 1 жэтон'));
       ch.append(el('div', { class: 'row' }, others.map(({ pl, i }) =>
         el('button', { class: 'btn small ghost', disabled: pl.tokens < 1,
-          onclick: () => { pl.tokens--; t.challenger = i; t.picking = 'challenger'; save(); render(); } }, pl.name))));
+          onclick: () => { pl.tokens--; t.challenges.push({ who: i, slot: null }); t.picking = 'challenger'; save(); render(); } }, pl.name))));
     }
 
     // reveal
@@ -855,8 +861,10 @@ dialog.sheet .notice { margin: 0; }
       rv.className = 'reveal ' + (t.ok ? 'ok' : 'bad');
       rv.innerHTML = '';
       let verdict;
-      if (t.ok) verdict = t.challenger != null ? `Правільна! ${S.players[t.challenger].name} губляе жэтон.` : 'Правільна! Картка твая.';
-      else if (t.cok) verdict = `Міма. Картку забірае ${S.players[t.challenger].name}.`;
+      const losers = t.challenges.map(c => S.players[c.who].name);
+      if (t.ok) verdict = !losers.length ? 'Правільна! Картка твая.'
+        : `Правільна! ${losers.join(', ')} ${losers.length > 1 ? 'губляюць' : 'губляе'} жэтон.`;
+      else if (t.taker != null) verdict = `Міма. Картку забірае ${S.players[t.taker].name}.`;
       else verdict = 'Міма. Картка адыходзіць.';
       rv.append(
         el('div', { class: 'verdict' }, verdict),
@@ -874,10 +882,10 @@ dialog.sheet .notice { margin: 0; }
     // actions
     const ac = $('#actions'); ac.innerHTML = '';
     if (!t.revealed) {
-      const ready = t.picking === 'challenger' ? t.cslot != null : t.slot != null;
-      if (t.picking === 'challenger') {
+      const ready = t.slot != null && t.challenges.every(c => c.slot != null);
+      if (chooser) {
         ac.append(el('button', { class: 'btn ghost', onclick: () => {
-          S.players[t.challenger].tokens++; t.challenger = null; t.cslot = null; t.picking = 'active'; save(); render();
+          S.players[chooser.who].tokens++; t.challenges.pop(); t.picking = 'active'; save(); render();
         } }, 'Адмяніць спрэчку'));
       }
       ac.append(el('button', { class: 'btn primary', disabled: !ready || !own, onclick: reveal }, 'Адкрыць картку'));
@@ -898,18 +906,19 @@ dialog.sheet .notice { margin: 0; }
 
   function pickSlot(i) {
     const t = S.turn;
-    if (t.picking === 'challenger') t.cslot = i; else t.slot = i;
+    if (t.picking === 'challenger') t.challenges[t.challenges.length - 1].slot = i;  // the latest challenger may still change it
+    else if (!t.challenges.length) t.slot = i;
     save(); render();
   }
 
   $('#btn-skip').onclick = () => {
     const t = S.turn;
     if (!t.error) return;
-    if (t.challenger != null) S.players[t.challenger].tokens++;
+    for (const c of t.challenges) S.players[c.who].tokens++;
     S.played = (S.played || []).filter(x => x !== t.song);  // a video that doesn't play doesn't use up its artist
     const id = draw();
     if (!id) return finish(true);
-    S.turn = { song: id, slot: null, challenger: null, cslot: null, picking: 'active', revealed: false, bonus: false, error: false };
+    S.turn = { song: id, slot: null, challenges: [], picking: 'active', revealed: false, bonus: false, error: false };
     save(); render(); cueSong(true);
   };
   /* ---------- REPORTS ("Нешта не так") ---------- */
@@ -1055,6 +1064,11 @@ dialog.sheet .notice { margin: 0; }
     if (S) { // songs removed from songs.js since the game was saved
       S.deck = S.deck.filter(id => BY_ID.has(id));
       if (S.turn && !BY_ID.has(S.turn.song)) S.turn = null;
+      // turns saved before several challengers were allowed
+      if (S.turn && !S.turn.challenges) {
+        S.turn.challenges = S.turn.challenger != null ? [{ who: S.turn.challenger, slot: S.turn.cslot }] : [];
+        if (S.turn.cok) S.turn.taker = S.turn.challenger;
+      }
     }
     renderPlayers(); renderHits(); renderFilters(); renderDeckInfo(); renderReports();
     $('#resume-panel').hidden = !S;
