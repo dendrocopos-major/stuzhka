@@ -312,7 +312,7 @@ dialog.sheet .notice { margin: 0; }
       <ol>
         <li>У кожнага гульца на пачатку адна адкрытая картка з годам і 3 жэтоны.</li>
         <li>На сваім ходзе грае песня. Назву не відаць. Выберы месца на сваёй стужцы, дзе гэтая песня павінна стаяць па годзе выхаду.</li>
-        <li>Пасля таго як ты выбраў месца, іншы гулец можа аспрэчыць: аддае жэтон і выбірае іншае месца. Калі ты памыліўся, а ён не, картка дастаецца яму.</li>
+        <li>Пасля таго як ты выбраў месца, іншыя гульцы па чарзе могуць аспрэчыць: кожны аддае жэтон і выбірае сваё, яшчэ вольнае месца. Калі ты памыліўся, картку забірае першы, хто паставіў правільна. Калі месца таго, хто аспрэчыў, таксама правільнае (той жа год, што ў суседняй карткі), жэтон яму вяртаецца.</li>
         <li>Адкрываем картку. Калі месца правільнае, картка застаецца ў цябе. Песні аднаго года можна ставіць у любым парадку.</li>
         <li>Назваў выканаўцу і назву? Атрымай +1 жэтон (не больш за 5).</li>
         <li>Перамагае першы, хто збярэ патрэбную колькасць картак.</li>
@@ -723,10 +723,15 @@ dialog.sheet .notice { margin: 0; }
 
   function reveal() {
     const t = S.turn, p = cur(), y = song(t.song).year;
+    const before = [...p.timeline];  // places are judged against the strip as it was before the card is added
     t.revealed = true;
-    t.ok = fits(p.timeline, t.slot, y);
+    t.ok = fits(before, t.slot, y);
+    const right = t.challenges.filter(c => fits(before, c.slot, y)).map(c => c.who);
     // A miss: the card goes to the first challenger (in the order they challenged) whose place was right
-    t.taker = t.ok ? null : t.challenges.find(c => fits(p.timeline, c.slot, y))?.who ?? null;
+    t.taker = t.ok ? null : right[0] ?? null;
+    // A challenger whose place was right as well (the song's year equals a neighbouring card's) gets the token back
+    t.refunded = right.filter(i => i !== t.taker);
+    for (const i of t.refunded) S.players[i].tokens++;
     if (t.ok) p.timeline.splice(t.slot, 0, t.song);
     else if (t.taker != null) insertSorted(S.players[t.taker].timeline, t.song);
     save(); render();
@@ -861,11 +866,13 @@ dialog.sheet .notice { margin: 0; }
       rv.className = 'reveal ' + (t.ok ? 'ok' : 'bad');
       rv.innerHTML = '';
       let verdict;
-      const losers = t.challenges.map(c => S.players[c.who].name);
-      if (t.ok) verdict = !losers.length ? 'Правільна! Картка твая.'
-        : `Правільна! ${losers.join(', ')} ${losers.length > 1 ? 'губляюць' : 'губляе'} жэтон.`;
-      else if (t.taker != null) verdict = `Міма. Картку забірае ${S.players[t.taker].name}.`;
-      else verdict = 'Міма. Картка адыходзіць.';
+      const refunded = t.refunded || [], name = i => S.players[i].name;
+      const losers = t.challenges.map(c => c.who).filter(i => i !== t.taker && !refunded.includes(i)).map(name);
+      const lose = losers.length ? ` ${losers.join(', ')} ${losers.length > 1 ? 'губляюць' : 'губляе'} жэтон.` : '';
+      const back = refunded.length ? ` ${refunded.map(name).join(', ')}: месца таксама правільнае, жэтон вяртаецца.` : '';
+      if (t.ok) verdict = 'Правільна! Картка твая.' + back + lose;
+      else if (t.taker != null) verdict = `Міма. Картку забірае ${name(t.taker)}.` + back + lose;
+      else verdict = 'Міма. Картка адыходзіць.' + lose;
       rv.append(
         el('div', { class: 'verdict' }, verdict),
         el('div', { class: 'big' }, el('span', { class: 'yr' }, String(s.year)),
