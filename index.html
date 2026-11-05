@@ -169,6 +169,7 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
 .slot.sel-a { width: 52px; border-style: solid; border-color: var(--accent); background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
 .slot.sel-c { width: 52px; border-style: solid; border-color: var(--ink); background: var(--sunken); color: var(--ink); }
 .slot:disabled { cursor: default; opacity: .5; }
+.slot.miss { width: 52px; border-style: solid; border-color: var(--bad); background: color-mix(in oklab, var(--bad) 12%, transparent); color: var(--bad); cursor: default; }
 .gap { flex: 0 0 auto; width: 8px; }
 /* Phones: narrow cards with just the year, so 5–6 fit on screen; a tap opens a card to show the artist and the title */
 @media (max-width: 600px) {
@@ -179,7 +180,7 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
   .card.open { width: 132px; text-align: left; padding: 8px; grid-template-rows: auto auto 1fr; align-items: start; }
   .card.open .ar, .card.open .ti { display: block; }
   .slot { width: 16px; margin: 0 1px; border-width: 1.5px; font-size: 14px; }
-  .slot.sel-a, .slot.sel-c { width: 34px; }
+  .slot.sel-a, .slot.sel-c, .slot.miss { width: 34px; }
   .gap { width: 6px; }
 }
 
@@ -815,17 +816,20 @@ dialog.sheet .notice { margin: 0; }
         if (i < list.length) tl.append(cardEl(song(list[i])));
       }
     } else {
-      list.forEach((id, i) => {
-        if (i) tl.append(el('span', { class: 'gap' }));
-        const isNew = own && t.revealed && t.ok && id === t.song;
-        tl.append(cardEl(song(id), isNew ? 'res-ok new' : ''));
-      });
+      const items = list.map(id => cardEl(song(id), own && t.revealed && t.ok && id === t.song ? 'res-ok new' : ''));
       if (own && t.revealed && !t.ok) {
-        tl.append(el('span', { class: 'gap' }), cardEl(song(t.song), 'res-bad new'));
+        // A miss: the card stands dashed where it belongs, and a cross marks the place that was picked
+        const y = song(t.song).year;
+        let right = 0; while (right < list.length && song(list[right]).year <= y) right++;
+        const miss = el('span', { class: 'slot miss', title: 'Тут быў твой выбар', 'aria-label': 'Твой выбар' }, '✕');
+        const missed = cardEl(song(t.song), 'res-bad new');
+        // Splice the later index first so the earlier one stays valid
+        if (t.slot > right) items.splice(t.slot, 0, miss), items.splice(right, 0, missed);
+        else items.splice(right, 0, missed), items.splice(t.slot, 0, miss);
       }
+      items.forEach((node, i) => { if (i) tl.append(el('span', { class: 'gap' })); tl.append(node); });
     }
-    // Keep the strip where it was across the rebuild, then glide to the chosen slot or the card just revealed
-    // (a missed card goes to the end of the strip, often off screen on a phone).
+    // Keep the strip where it was across the rebuild, then glide to the chosen slot or the card just revealed.
     tl.scrollLeft = prevScroll;
     const sel = tl.querySelector('.sel-c, .sel-a, .new');
     if (sel) {
