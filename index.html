@@ -265,6 +265,9 @@ details.rules ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 6px
 .center-screen { min-height: 70vh; display: grid; place-content: center; text-align: center; gap: 18px; justify-items: center; }
 .center-screen h1 { font-size: clamp(32px, 8vw, 52px); }
 .center-screen h1 em { font-style: normal; color: var(--accent); }
+.scan-view { position: relative; width: min(78vw, 320px); aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: #000; }
+.scan-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan-frame { position: absolute; inset: 14%; border: 3px solid rgba(255,255,255,.85); border-radius: 12px; box-shadow: 0 0 0 999px rgba(0,0,0,.28); }
 .final { display: grid; gap: 14px; width: 100%; }
 .final .timeline { min-height: 0; }
 .notice { font-size: 14px; color: var(--muted); }
@@ -359,6 +362,7 @@ dialog.sheet .notice { margin: 0; }
 
     <div class="row end" id="start-row">
       <span class="err" id="setup-err"></span>
+      <button class="btn ghost" id="btn-scan" title="Для надрукаваных картак з QR-кодамі">Сканаваць карткі</button>
       <button class="btn primary" id="btn-start">Пачаць гульню</button>
     </div>
 
@@ -433,8 +437,24 @@ dialog.sheet .notice { margin: 0; }
     <div class="label">Песенная стужка · картка</div>
     <div id="card-deck"></div>
     <p class="muted" id="card-text">Націсні на пласцінку. Год, выканаўца і назва — на адвароце карткі.</p>
-    <div class="row"><button class="btn small ghost" id="card-fwd">Пераматаць на 15 с</button></div>
+    <div class="row">
+      <button class="btn small ghost" id="card-fwd">Пераматаць на 15 с</button>
+      <button class="btn small primary" id="card-scan">Сканаваць наступныя</button>
+    </div>
     <a class="muted" href="./">Гуляць без картак</a>
+  </section>
+
+  <!-- SCAN: the camera reads printed cards inside the page, so after the first tap every card plays straight away -->
+  <section id="scan" class="center-screen" hidden>
+    <div class="label">Песенная стужка · друкаваныя карткі</div>
+    <div class="scan-view" id="scan-view"><video id="scan-video" playsinline muted></video><span class="scan-frame"></span></div>
+    <div id="scan-deck" hidden></div>
+    <p class="muted" id="scan-text"></p>
+    <div class="row">
+      <button class="btn small ghost" id="scan-fwd" hidden>Пераматаць на 15 с</button>
+      <button class="btn primary" id="scan-next" hidden>Наступная картка</button>
+    </div>
+    <a class="muted" href="./">Выйсці</a>
   </section>
 </div>
 
@@ -684,7 +704,7 @@ dialog.sheet .notice { margin: 0; }
   /* ---------- STATE ---------- */
   function save() { store.set(SAVE_KEY, S); }
   function show(id) {
-    for (const s of ['setup', 'handoff', 'game', 'win', 'card']) $('#' + s).hidden = s !== id;
+    for (const s of ['setup', 'handoff', 'game', 'win', 'card', 'scan']) $('#' + s).hidden = s !== id;
     window.scrollTo(0, 0);
   }
   const cur = () => S.players[S.current];
@@ -1011,17 +1031,20 @@ dialog.sheet .notice { margin: 0; }
 
   /* ---------- AUDIO (hidden YouTube player) ---------- */
   let yt = null, ytReady = false, loadedId = null, playing = false, seekedFor = null, wantPlay = false;
-  // A printed card plays its own song; otherwise the player follows the current turn
-  const CARD = new URLSearchParams(location.search).get('k');
-  let cardPlayable = !!CARD && BY_ID.has(CARD);
-  const currentId = () => CARD ? (cardPlayable ? CARD : null) : S?.turn?.song;
-  const startMode = () => S ? S.start : prefs.start;
+  const SCAN_ANSWER = 'Год, выканаўца і назва — на адвароце карткі.';
+  // A printed card (opened by its QR code or read by the scanner) plays its own song; otherwise the player follows the current turn
+  let cardId = new URLSearchParams(location.search).get('k');
+  let cardMode = !!cardId;
+  let cardPlayable = cardMode && BY_ID.has(cardId);
+  const currentId = () => cardMode ? (cardPlayable ? cardId : null) : S?.turn?.song;
+  const startMode = () => cardMode || !S ? prefs.start : S.start;
   const PLAY_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
   const PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
   function setPlaying(v) {
     playing = v;
     $('#vinyl-box').classList.toggle('spin', v);
     $('#play-glyph').innerHTML = v ? PAUSE_SVG : PLAY_SVG;
+    if (v && cardMode) $('#scan-text').textContent = $('#card-text').textContent = SCAN_ANSWER;  // drops the "tap the record" hint once it plays
     if (S && S.turn) renderStatus();
   }
   setPlaying(false);
@@ -1050,7 +1073,7 @@ dialog.sheet .notice { margin: 0; }
         },
         onError: () => {
           setPlaying(false);
-          if (CARD) $('#card-text').textContent = 'Гэтая песня цяпер не прайграецца. Вазьміце іншую картку.';
+          if (cardMode) $('#card-text').textContent = $('#scan-text').textContent = 'Гэтая песня цяпер не прайграецца. Вазьміце іншую картку.';
           else if (S && S.turn) { S.turn.error = true; save(); render(); }
         },
       },
@@ -1077,6 +1100,17 @@ dialog.sheet .notice { margin: 0; }
     } else if (autoplay) yt.playVideo();
   }
   function stopAudio() { if (ytReady) { try { yt.stopVideo(); } catch {} } setPlaying(false); }
+  // Moving the turntable to another screen moves the YouTube iframe, which reloads it and loses the player's
+  // events; so an existing player is dropped first and made again in the new place.
+  function moveTurntable(target) {
+    const box = $('#vinyl-box');
+    if (box.parentNode === target) return;
+    const remake = !!yt;
+    if (remake) { try { yt.destroy(); } catch {} yt = null; ytReady = false; loadedId = null; }
+    if (!$('#yt')) $('#yt-holder').append(el('div', { id: 'yt' }));
+    target.append(box);
+    if (remake) window.onYouTubeIframeAPIReady();
+  }
 
   $('#btn-play').onclick = () => {
     const id = currentId();
@@ -1114,16 +1148,97 @@ dialog.sheet .notice { margin: 0; }
     setTimeout(() => { delete b.dataset.armed; b.textContent = 'Выдаліць'; }, 3000);
   };
   // A printed card: just the turntable for its song
+  const GONE = 'Гэтай песні ўжо няма ў гульні. Вазьміце іншую картку.';
   function bootCard() {
-    $('#card-deck').append($('#vinyl-box'));
-    const gone = 'Гэтай песні ўжо няма ў гульні. Вазьміце іншую картку.';
-    if (!cardPlayable) $('#card-text').textContent = gone;
+    moveTurntable($('#card-deck'));
+    if (!cardPlayable) $('#card-text').textContent = GONE;
     regionReady.then(() => {
-      if (inBelarus && song(CARD)?.byRisk) { cardPlayable = false; stopAudio(); $('#card-text').textContent = gone; }
+      if (inBelarus && song(cardId)?.byRisk) { cardPlayable = false; $('#card-text').textContent = GONE; return; }
+      // Try to start at once; most phones block sound until a tap, and then the turntable waits for it
+      if (cardPlayable) cueSong(true);
     });
     show('card');
   }
-  if (CARD) bootCard(); else boot();
+
+  /* ---------- SCANNER (printed cards) ---------- */
+  // Phones allow sound only after a tap on the page. Opening a card from the camera app is a fresh page, so it
+  // waits for a tap every time; this scanner keeps one page open, and every card after the first plays at once.
+  const JSQR = { src: 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js',
+    integrity: 'sha384-hStSInNIZ8ljtOVrmrgf7zdHMapaLBWoSnPTtF0nzsybp4+LuhDz6sHuEVpWIX8o' };
+  let scanStream = null, scanTimer = null, detector = null, scanCanvas = null;
+  function scanUi(playingCard) {
+    $('#scan-view').hidden = playingCard;
+    $('#scan-deck').hidden = $('#scan-next').hidden = $('#scan-fwd').hidden = !playingCard;
+    $('#scan-text').textContent = playingCard ? SCAN_ANSWER : 'Навядзі камеру на QR-код карткі.';
+  }
+  function loadJsQR() {
+    if (window.jsQR) return Promise.resolve();
+    return new Promise((ok, fail) => document.head.append(el('script', { ...JSQR, crossorigin: 'anonymous', onload: ok, onerror: fail })));
+  }
+  async function startScanner() {
+    ensurePlayer();
+    stopAudio();
+    cardMode = true; cardId = null; cardPlayable = false;
+    moveTurntable($('#scan-deck'));
+    show('scan'); scanUi(false);
+    try {
+      scanStream ||= await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      const v = $('#scan-video');
+      v.srcObject = scanStream; await v.play().catch(() => {});
+    } catch {
+      $('#scan-text').textContent = 'Няма доступу да камеры. Дазвольце яго ў наладах браўзера або сканіруйце карткі камерай тэлефона.';
+      return;
+    }
+    // The browser's own QR reader where there is one (Chrome on Android), jsQR elsewhere (iPhone, Firefox)
+    try {
+      if (!detector && 'BarcodeDetector' in window && (await BarcodeDetector.getSupportedFormats()).includes('qr_code')) {
+        detector = new BarcodeDetector({ formats: ['qr_code'] });
+      }
+    } catch {}
+    if (!detector) {
+      try { await loadJsQR(); } catch { $('#scan-text').textContent = 'Не ўдалося загрузіць сканер. Праверце інтэрнэт і паспрабуйце яшчэ раз.'; return; }
+    }
+    scanLoop();
+  }
+  function scanLoop() {
+    clearTimeout(scanTimer);
+    if ($('#scan').hidden || cardId) return;
+    scanTimer = setTimeout(async () => {
+      const text = await readFrame();
+      if (text) onScanned(text); else scanLoop();
+    }, 200);
+  }
+  async function readFrame() {
+    const v = $('#scan-video');
+    if (v.readyState < 2 || !v.videoWidth) return null;
+    try {
+      if (detector) return (await detector.detect(v))[0]?.rawValue || null;
+      // jsQR works on pixels: a 480 px wide frame is enough for a card held in front of the camera
+      const w = 480, h = Math.round(v.videoHeight * w / v.videoWidth);
+      scanCanvas ||= document.createElement('canvas');
+      scanCanvas.width = w; scanCanvas.height = h;
+      const g = scanCanvas.getContext('2d', { willReadFrequently: true });
+      g.drawImage(v, 0, 0, w, h);
+      return window.jsQR(g.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' })?.data || null;
+    } catch { return null; }
+  }
+  function onScanned(text) {
+    let id = null;
+    try { id = new URL(text).searchParams.get('k'); } catch {}
+    if (!id || !BY_ID.has(id) || (inBelarus && song(id).byRisk)) {
+      $('#scan-text').textContent = id ? GONE : 'Гэта не картка «Песеннай стужкі».';
+      return scanLoop();
+    }
+    cardId = id; cardPlayable = true;
+    scanUi(true);
+    cueSong(true);
+    setTimeout(() => { if (cardId === id && !playing) $('#scan-text').textContent = 'Націсні на пласцінку, каб пачаць.'; }, 4000);
+  }
+  $('#btn-scan').onclick = $('#card-scan').onclick = startScanner;
+  $('#scan-next').onclick = () => { stopAudio(); cardId = null; cardPlayable = false; scanUi(false); scanLoop(); };
+  $('#scan-fwd').onclick = $('#btn-fwd').onclick;
+
+  if (cardMode) bootCard(); else boot();
   ensurePlayer(); // load the YouTube player in advance: creating it on the first tap adds seconds of delay
 })();
 </script>
