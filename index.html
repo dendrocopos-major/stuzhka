@@ -1068,13 +1068,20 @@ dialog.sheet .notice { margin: 0; }
         onReady: () => { ytReady = true; cueSong(wantPlay); },
         onStateChange: e => {
           if (e.data === YT.PlayerState.PLAYING) {
+            // Only the song on the card may sound: anything YouTube starts by itself (the next video) is stopped
+            const playingId = yt.getVideoData?.()?.video_id;
+            if (loadedId && playingId && playingId !== loadedId) { yt.stopVideo(); setPlaying(false); return; }
             setPlaying(true);
             if (startMode() === 'mid' && seekedFor !== loadedId) {
               seekedFor = loadedId;
               const d = yt.getDuration();
               if (d > 90) yt.seekTo(Math.round(d * 0.33), true);
             }
-          } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) setPlaying(false);
+          } else if (e.data === YT.PlayerState.ENDED) {
+            // At the end YouTube offers or starts other videos; cue the same song again so the record replays it
+            stallWatch(false); setPlaying(false);
+            if (loadedId) yt.cueVideoById({ videoId: loadedId, startSeconds: startAt(loadedId) });
+          } else if (e.data === YT.PlayerState.PAUSED) setPlaying(false);
         },
         onError: () => {
           setPlaying(false);
