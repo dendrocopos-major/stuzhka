@@ -427,6 +427,15 @@ dialog.sheet .notice { margin: 0; }
     <div class="final" id="final"></div>
     <button class="btn primary" id="btn-new">Новая гульня</button>
   </section>
+
+  <!-- CARD: a printed card's QR code opens this, ?k=<YouTube id>; the answer is on the back of the card -->
+  <section id="card" class="center-screen" hidden>
+    <div class="label">Песенная стужка · картка</div>
+    <div id="card-deck"></div>
+    <p class="muted" id="card-text">Націсні на пласцінку. Год, выканаўца і назва — на адвароце карткі.</p>
+    <div class="row"><button class="btn small ghost" id="card-fwd">Пераматаць на 15 с</button></div>
+    <a class="muted" href="./">Гуляць без картак</a>
+  </section>
 </div>
 
 <dialog class="sheet" id="report-dlg" aria-labelledby="report-h">
@@ -675,7 +684,7 @@ dialog.sheet .notice { margin: 0; }
   /* ---------- STATE ---------- */
   function save() { store.set(SAVE_KEY, S); }
   function show(id) {
-    for (const s of ['setup', 'handoff', 'game', 'win']) $('#' + s).hidden = s !== id;
+    for (const s of ['setup', 'handoff', 'game', 'win', 'card']) $('#' + s).hidden = s !== id;
     window.scrollTo(0, 0);
   }
   const cur = () => S.players[S.current];
@@ -1002,6 +1011,11 @@ dialog.sheet .notice { margin: 0; }
 
   /* ---------- AUDIO (hidden YouTube player) ---------- */
   let yt = null, ytReady = false, loadedId = null, playing = false, seekedFor = null, wantPlay = false;
+  // A printed card plays its own song; otherwise the player follows the current turn
+  const CARD = new URLSearchParams(location.search).get('k');
+  let cardPlayable = !!CARD && BY_ID.has(CARD);
+  const currentId = () => CARD ? (cardPlayable ? CARD : null) : S?.turn?.song;
+  const startMode = () => S ? S.start : prefs.start;
   const PLAY_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
   const PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
   function setPlaying(v) {
@@ -1027,14 +1041,18 @@ dialog.sheet .notice { margin: 0; }
         onStateChange: e => {
           if (e.data === YT.PlayerState.PLAYING) {
             setPlaying(true);
-            if (S && S.start === 'mid' && seekedFor !== loadedId) {
+            if (startMode() === 'mid' && seekedFor !== loadedId) {
               seekedFor = loadedId;
               const d = yt.getDuration();
               if (d > 90) yt.seekTo(Math.round(d * 0.33), true);
             }
           } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) setPlaying(false);
         },
-        onError: () => { setPlaying(false); if (S && S.turn) { S.turn.error = true; save(); render(); } },
+        onError: () => {
+          setPlaying(false);
+          if (CARD) $('#card-text').textContent = 'Гэтая песня цяпер не прайграецца. Вазьміце іншую картку.';
+          else if (S && S.turn) { S.turn.error = true; save(); render(); }
+        },
       },
     });
   };
@@ -1043,12 +1061,12 @@ dialog.sheet .notice { margin: 0; }
   // instead of playing from 0 and seeking, which buffers twice.
   function startAt(id) {
     const d = song(id).dur;
-    if (!S || S.start !== 'mid' || !d) return 0;
+    if (startMode() !== 'mid' || !d) return 0;
     return d > 90 ? Math.round(d * 0.33) : 0;
   }
   function cueSong(autoplay = false) {
-    if (!S || !S.turn) return;
-    const id = S.turn.song;
+    const id = currentId();
+    if (!id) return;
     if (!ytReady) { wantPlay = wantPlay || autoplay; return; }
     wantPlay = false;
     if (loadedId !== id) {
@@ -1061,12 +1079,13 @@ dialog.sheet .notice { margin: 0; }
   function stopAudio() { if (ytReady) { try { yt.stopVideo(); } catch {} } setPlaying(false); }
 
   $('#btn-play').onclick = () => {
-    if (!S || !S.turn) return;
+    const id = currentId();
+    if (!id) return;
     if (!ytReady) { wantPlay = true; ensurePlayer(); return; }
-    if (loadedId !== S.turn.song) return cueSong(true);
+    if (loadedId !== id) return cueSong(true);
     if (playing) yt.pauseVideo(); else yt.playVideo();
   };
-  $('#btn-fwd').onclick = () => { if (ytReady && loadedId) yt.seekTo(yt.getCurrentTime() + 15, true); };
+  $('#btn-fwd').onclick = $('#card-fwd').onclick = () => { if (ytReady && loadedId) yt.seekTo(yt.getCurrentTime() + 15, true); };
 
   /* ---------- BOOT ---------- */
   function boot() {
@@ -1094,7 +1113,17 @@ dialog.sheet .notice { margin: 0; }
     b.dataset.armed = '1'; b.textContent = 'Выдаліць?';
     setTimeout(() => { delete b.dataset.armed; b.textContent = 'Выдаліць'; }, 3000);
   };
-  boot();
+  // A printed card: just the turntable for its song
+  function bootCard() {
+    $('#card-deck').append($('#vinyl-box'));
+    const gone = 'Гэтай песні ўжо няма ў гульні. Вазьміце іншую картку.';
+    if (!cardPlayable) $('#card-text').textContent = gone;
+    regionReady.then(() => {
+      if (inBelarus && song(CARD)?.byRisk) { cardPlayable = false; stopAudio(); $('#card-text').textContent = gone; }
+    });
+    show('card');
+  }
+  if (CARD) bootCard(); else boot();
   ensurePlayer(); // load the YouTube player in advance: creating it on the first tap adds seconds of delay
 })();
 </script>
