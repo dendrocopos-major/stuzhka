@@ -686,12 +686,26 @@ dialog.sheet .notice { margin: 0; }
     while (i >= 0 && artistKeys(deck[i]).some(k => used.has(k))) i--;
     const id = i >= 0 ? deck.splice(i, 1)[0] : deck.pop();
     played.push(id);
+    markHeard(id);
     return id;
+  }
+
+  // Songs this browser has already drawn, across games: { n: counter, ids: { id: when } }. A new deck puts them
+  // under the ones not heard yet (the deck is drawn from the end), the most recent at the very bottom.
+  const HEARD_KEY = 'stuzhka-heard-v1';
+  function markHeard(id) {
+    const h = store.get(HEARD_KEY) || { n: 0, ids: {} };
+    h.ids[id] = ++h.n;
+    store.set(HEARD_KEY, h);
+  }
+  function freshFirst(ids) {
+    const heard = (store.get(HEARD_KEY) || {}).ids || {};
+    return shuffle(ids).sort((a, b) => (heard[b] || 0) - (heard[a] || 0));  // stable: unheard keep their shuffle
   }
 
   function newGame() {
     const names = prefs.names.map(n => n.trim()).filter(Boolean);
-    const deck = shuffle(pool().map(s => s.yt));
+    const deck = freshFirst(pool().map(s => s.yt));
     const target = Number(prefs.target);
     if (names.length < 1) return showErr('Дадайце хаця б аднаго гульца.');
     if (deck.length < names.length * (target + 2)) return showErr('Замала песень для такой гульні. Паменшыце колькасць картак ці гульцоў.');
